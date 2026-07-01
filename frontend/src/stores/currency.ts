@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { getSettings } from '@/api/admin/settings'
+import type { PublicSettings } from '@/types'
 
 export type DisplayCurrency = 'USD' | 'CNY'
 
@@ -86,6 +87,26 @@ export const useCurrencyStore = defineStore('currency', () => {
     }
   }
 
+  function initFromInjectedConfig(config: PublicSettings) {
+    if (config.default_display_currency) {
+      displayCurrency.value = config.default_display_currency as DisplayCurrency
+      try {
+        localStorage.setItem(STORAGE_KEY, config.default_display_currency)
+      } catch (e) {
+        // ignore
+      }
+    }
+    if (config.default_exchange_rate && config.default_exchange_rate > 0) {
+      exchangeRate.value = config.default_exchange_rate
+      try {
+        localStorage.setItem(EXCHANGE_RATE_KEY, config.default_exchange_rate.toString())
+      } catch (e) {
+        // ignore
+      }
+    }
+    initialized.value = true
+  }
+
   function convertAmount(amount: number | null | undefined): number {
     if (amount === null || amount === undefined) return 0
     if (displayCurrency.value === 'USD') return amount
@@ -119,6 +140,7 @@ export const useCurrencyStore = defineStore('currency', () => {
     toggleCurrency,
     setExchangeRate,
     initFromSettings,
+    initFromInjectedConfig,
     convertAmount,
     formatAmount,
   }

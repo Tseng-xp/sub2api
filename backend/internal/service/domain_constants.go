@@ -267,6 +267,10 @@ const (
 	SettingKeyDefaultSubscriptions = "default_subscriptions"  // 新用户默认订阅列表（JSON）
 	SettingKeyDefaultUserRPMLimit  = "default_user_rpm_limit" // 新用户默认 RPM 限制（0 = 不限制）
 
+	// 货币显示设置
+	SettingKeyDefaultDisplayCurrency = "default_display_currency" // 默认显示货币（USD/CNY）
+	SettingKeyDefaultExchangeRate    = "default_exchange_rate"    // 默认汇率（人民币兑美元）
+
 	// 第三方认证来源默认授予配置
 	SettingKeyAuthSourceDefaultEmailBalance             = "auth_source_default_email_balance"
 	SettingKeyAuthSourceDefaultEmailConcurrency         = "auth_source_default_email_concurrency"

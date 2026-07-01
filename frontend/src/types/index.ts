@@ -236,6 +236,8 @@ export interface PublicSettings {
   service_quota_enabled: boolean
   affiliate_enabled: boolean
   allow_user_view_error_requests?: boolean
+  default_display_currency?: string
+  default_exchange_rate?: number
 }
 
 export interface AuthResponse {
