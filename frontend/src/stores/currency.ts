@@ -33,7 +33,7 @@ function loadExchangeRate(): number {
   } catch (e) {
     // ignore
   }
-  return defaultExchangeRate
+  return 0
 }
 
 export const useCurrencyStore = defineStore('currency', () => {
