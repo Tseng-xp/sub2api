@@ -7,7 +7,6 @@ export type DisplayCurrency = 'USD' | 'CNY'
 
 const STORAGE_KEY = 'sub2_display_currency'
 const EXCHANGE_RATE_KEY = 'sub2_exchange_rate'
-const defaultExchangeRate = 7.25
 
 function loadCurrency(): DisplayCurrency {
   try {

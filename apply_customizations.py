@@ -131,7 +131,7 @@ export type DisplayCurrency = 'USD' | 'CNY';
 const STORAGE_KEY = 'sub2_display_currency';
 const EXCHANGE_RATE_KEY = 'sub2_exchange_rate';
 
-const defaultExchangeRate = 7.25;
+const defaultExchangeRate = 0;
 
 const displayCurrency = ref<DisplayCurrency>(loadCurrency());
 const exchangeRate = ref<number>(loadExchangeRate());
