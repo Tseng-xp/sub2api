@@ -7172,7 +7172,7 @@
                   </button>
                   <button
                     type="button"
-                    @click="currencyForm.default_display_currency = 'CNY'"
+                    @click="setCurrencyToCNY"
                     :class="[
                       'btn btn-sm px-4',
                       currencyForm.default_display_currency === 'CNY'
@@ -10080,6 +10080,13 @@ async function saveCurrencySettings() {
     );
   } finally {
     currencySaving.value = false;
+  }
+}
+
+function setCurrencyToCNY() {
+  currencyForm.default_display_currency = 'CNY';
+  if (currencyStore.exchangeRate > 0) {
+    currencyForm.default_exchange_rate = currencyStore.exchangeRate;
   }
 }
 
