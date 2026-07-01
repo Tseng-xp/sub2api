@@ -20,6 +20,11 @@
       </main>
     </div>
   </div>
+  <footer class="fixed bottom-0 left-64 right-0 py-2 text-center text-xs text-gray-400 dark:text-dark-500 border-t border-gray-200/50 dark:border-dark-800/50 bg-gray-50/80 dark:bg-dark-950/80 backdrop-blur-sm z-50">
+    <a href="https://beian.miit.gov.cn" target="_blank" rel="noopener noreferrer" class="hover:text-gray-600 dark:hover:text-dark-300 transition-colors">
+      粤ICP备2025408634号-4
+    </a>
+  </footer>
 </template>
 
 <script setup lang="ts">

@@ -7134,6 +7134,121 @@
         </div>
         <!-- /Tab: Email -->
 
+        <!-- Tab: Currency -->
+        <div v-show="activeTab === 'currency'" class="space-y-6">
+          <div class="card">
+            <div
+              class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
+            >
+              <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+                {{ t("admin.settings.currency.title") }}
+              </h2>
+              <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                {{ t("admin.settings.currency.description") }}
+              </p>
+            </div>
+            <div class="space-y-5 p-6">
+              <div class="flex items-center justify-between">
+                <div>
+                  <label class="font-medium text-gray-900 dark:text-white">{{
+                    t("admin.settings.currency.defaultCurrency")
+                  }}</label>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">
+                    {{ t("admin.settings.currency.defaultCurrencyHint") }}
+                  </p>
+                </div>
+                <div class="flex gap-2">
+                  <button
+                    type="button"
+                    @click="currencyForm.default_display_currency = 'USD'"
+                    :class="[
+                      'btn btn-sm px-4',
+                      currencyForm.default_display_currency === 'USD'
+                        ? 'btn-primary'
+                        : 'btn-secondary',
+                    ]"
+                  >
+                    USD ($)
+                  </button>
+                  <button
+                    type="button"
+                    @click="currencyForm.default_display_currency = 'CNY'"
+                    :class="[
+                      'btn btn-sm px-4',
+                      currencyForm.default_display_currency === 'CNY'
+                        ? 'btn-primary'
+                        : 'btn-secondary',
+                    ]"
+                  >
+                    CNY (¥)
+                  </button>
+                </div>
+              </div>
+
+              <div
+                v-if="currencyForm.default_display_currency === 'CNY'"
+                class="border-t border-gray-100 pt-4 dark:border-dark-700"
+              >
+                <label
+                  class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                >
+                  {{ t("admin.settings.currency.exchangeRate") }}
+                </label>
+                <div class="flex items-center gap-3">
+                  <span class="text-gray-500 dark:text-gray-400">1 USD =</span>
+                  <input
+                    v-model.number="currencyForm.default_exchange_rate"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    class="input w-40"
+                  />
+                  <span class="text-gray-500 dark:text-gray-400">CNY</span>
+                </div>
+                <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                  {{ t("admin.settings.currency.exchangeRateHint") }}
+                </p>
+              </div>
+
+              <div
+                class="flex justify-end border-t border-gray-100 pt-4 dark:border-dark-700"
+              >
+                <button
+                  type="button"
+                  @click="saveCurrencySettings"
+                  :disabled="currencySaving"
+                  class="btn btn-primary btn-sm"
+                >
+                  <svg
+                    v-if="currencySaving"
+                    class="mr-1 h-4 w-4 animate-spin"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      class="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      stroke-width="4"
+                    ></circle>
+                    <path
+                      class="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                  {{
+                    currencySaving ? t("common.saving") : t("common.save")
+                  }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- /Tab: Currency -->
+
         <!-- Tab: Backup -->
         <div v-show="activeTab === 'backup'">
           <BackupSettings />
@@ -7262,6 +7377,7 @@ import { affiliatesAPI, type AffiliateAdminEntry, type SimpleUser as AffiliateSi
 import { extractApiErrorMessage, extractI18nErrorMessage } from "@/utils/apiError";
 import { useAppStore } from "@/stores";
 import { useAdminSettingsStore } from "@/stores/adminSettings";
+import { useCurrencyStore } from "@/stores";
 import { normalizeVisibleMethod } from "@/components/payment/paymentFlow";
 import {
   isRegistrationEmailSuffixDomainValid,
@@ -7278,6 +7394,7 @@ import {
 
 const { t, locale } = useI18n();
 const appStore = useAppStore();
+const currencyStore = useCurrencyStore();
 const adminSettingsStore = useAdminSettingsStore();
 const isZhLocale = computed(() => locale.value.startsWith("zh"));
 
@@ -7305,6 +7422,7 @@ type SettingsTab =
   | "users"
   | "gateway"
   | "payment"
+  | "currency"
   | "email"
   | "backup";
 const activeTab = ref<SettingsTab>("general");
@@ -7316,6 +7434,7 @@ const settingsTabs = [
   { key: "users" as SettingsTab, icon: "user" as const },
   { key: "gateway" as SettingsTab, icon: "server" as const },
   { key: "payment" as SettingsTab, icon: "creditCard" as const },
+  { key: "currency" as SettingsTab, icon: "dollar" as const },
   { key: "email" as SettingsTab, icon: "mail" as const },
   { key: "backup" as SettingsTab, icon: "database" as const },
 ];
@@ -8923,6 +9042,10 @@ async function loadSettings() {
 
     // Load web search emulation config separately
     await loadWebSearchConfig();
+
+    // Load currency settings
+    currencyForm.default_display_currency = settings.default_display_currency || 'USD';
+    currencyForm.default_exchange_rate = settings.default_exchange_rate || 7.25;
   } catch (error: unknown) {
     loadFailed.value = true;
     appStore.showError(
@@ -9941,6 +10064,25 @@ async function saveBetaPolicySettings() {
   }
 }
 
+async function saveCurrencySettings() {
+  currencySaving.value = true;
+  try {
+    await adminAPI.settings.updateSettings({
+      default_display_currency: currencyForm.default_display_currency,
+      default_exchange_rate: currencyForm.default_exchange_rate,
+    });
+    currencyStore.setCurrency(currencyForm.default_display_currency);
+    currencyStore.setExchangeRate(currencyForm.default_exchange_rate);
+    appStore.showSuccess(t("admin.settings.currency.saved"));
+  } catch (error: unknown) {
+    appStore.showError(
+      extractApiErrorMessage(error, t("admin.settings.currency.saveFailed")),
+    );
+  } finally {
+    currencySaving.value = false;
+  }
+}
+
 // ==================== Provider Management ====================
 
 const allPaymentTypes = computed(() => [
@@ -10377,6 +10519,16 @@ const affiliateBatchModal = reactive<{
   saving: false,
   rate: "",
 });
+
+const currencyForm = reactive<{
+  default_display_currency: 'USD' | 'CNY';
+  default_exchange_rate: number;
+}>({
+  default_display_currency: 'USD',
+  default_exchange_rate: 7.25,
+});
+
+const currencySaving = ref(false);
 
 // affiliateConfirmDialog drives the project-standard <ConfirmDialog>. We can't
 // `await` the user's response from the dialog component, so the confirm action
