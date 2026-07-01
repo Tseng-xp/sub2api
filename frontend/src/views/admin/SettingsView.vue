@@ -9044,8 +9044,8 @@ async function loadSettings() {
     await loadWebSearchConfig();
 
     // Load currency settings
-    currencyForm.default_display_currency = settings.default_display_currency || 'USD';
-    currencyForm.default_exchange_rate = settings.default_exchange_rate || 7.25;
+    currencyForm.default_display_currency = settings.default_display_currency ?? 'USD';
+    currencyForm.default_exchange_rate = settings.default_exchange_rate ?? 0;
   } catch (error: unknown) {
     loadFailed.value = true;
     appStore.showError(
@@ -10525,7 +10525,7 @@ const currencyForm = reactive<{
   default_exchange_rate: number;
 }>({
   default_display_currency: 'USD',
-  default_exchange_rate: 7.25,
+  default_exchange_rate: 0,
 });
 
 const currencySaving = ref(false);

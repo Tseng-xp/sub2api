@@ -964,7 +964,7 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 func parseExchangeRate(raw string) float64 {
 	v, err := strconv.ParseFloat(strings.TrimSpace(raw), 64)
 	if err != nil || v <= 0 {
-		return 7.25
+		return 0
 	}
 	return v
 }
