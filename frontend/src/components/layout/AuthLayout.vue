@@ -57,6 +57,10 @@
       <!-- Copyright -->
       <div class="mt-8 text-center text-xs text-gray-400 dark:text-dark-500">
         &copy; {{ currentYear }} {{ siteName }}. All rights reserved.
+      <br />
+      <a href="https://beian.miit.gov.cn" target="_blank" rel="noopener noreferrer" class="text-gray-400 hover:text-gray-600 dark:text-dark-500 dark:hover:text-dark-300 transition-colors">
+        粤ICP备2025408634号-4
+      </a>
       </div>
     </div>
   </div>

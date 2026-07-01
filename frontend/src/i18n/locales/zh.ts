@@ -5771,6 +5771,7 @@ export default {
         email: '邮件设置',
         backup: '数据备份',
         payment: '支付设置',
+        currency: '货币设置',
       },
       features: {
         channelMonitor: {
@@ -5854,6 +5855,16 @@ export default {
             clearHint: '留空提交将清除所选用户的专属比例。',
           },
         },
+      },
+      currency: {
+        title: '货币设置',
+        description: '配置系统默认显示货币和汇率转换',
+        defaultCurrency: '默认显示货币',
+        defaultCurrencyHint: '设置新用户首次访问时默认显示的货币',
+        exchangeRate: '汇率',
+        exchangeRateHint: '1 美元兑换多少人民币，用于将美元金额转换为人民币显示',
+        saved: '货币设置保存成功',
+        saveFailed: '保存货币设置失败',
       },
       emailTabDisabledTitle: '邮箱验证未启用',
       emailTabDisabledHint: '请在「安全与认证」选项卡中启用邮箱验证后，再配置 SMTP 设置。',

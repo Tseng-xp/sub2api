@@ -5611,6 +5611,7 @@ export default {
         email: 'Email',
         backup: 'Backup',
         payment: 'Payment',
+        currency: 'Currency',
       },
       features: {
         channelMonitor: {
@@ -5694,6 +5695,16 @@ export default {
             clearHint: 'Submitting empty will clear the exclusive rate for selected users.',
           },
         },
+      },
+      currency: {
+        title: 'Currency Settings',
+        description: 'Configure system default display currency and exchange rate conversion',
+        defaultCurrency: 'Default Display Currency',
+        defaultCurrencyHint: 'Set the default currency displayed for new users',
+        exchangeRate: 'Exchange Rate',
+        exchangeRateHint: 'How many CNY equals 1 USD, used to convert USD amounts to CNY display',
+        saved: 'Currency settings saved successfully',
+        saveFailed: 'Failed to save currency settings',
       },
       emailTabDisabledTitle: 'Email Verification Not Enabled',
       emailTabDisabledHint: 'Enable email verification in the Security tab to configure SMTP settings.',
