@@ -688,6 +688,9 @@ type UpdateSettingsRequest struct {
 	AuthSourceDingTalkPlatformQuotas map[string]*service.DefaultPlatformQuotaSetting `json:"auth_source_default_dingtalk_platform_quotas"`
 
 	AllowUserViewErrorRequests *bool `json:"allow_user_view_error_requests"`
+
+	DefaultDisplayCurrency *string  `json:"default_display_currency"`
+	DefaultExchangeRate    *float64 `json:"default_exchange_rate"`
 }
 
 // UpdateSettings 更新系统设置
@@ -1660,6 +1663,18 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 				return *req.AllowUserViewErrorRequests
 			}
 			return previousSettings.AllowUserViewErrorRequests
+		}(),
+		DefaultDisplayCurrency: func() string {
+			if req.DefaultDisplayCurrency != nil {
+				return *req.DefaultDisplayCurrency
+			}
+			return previousSettings.DefaultDisplayCurrency
+		}(),
+		DefaultExchangeRate: func() float64 {
+			if req.DefaultExchangeRate != nil {
+				return *req.DefaultExchangeRate
+			}
+			return previousSettings.DefaultExchangeRate
 		}(),
 		OpsMonitoringEnabled: func() bool {
 			if req.OpsMonitoringEnabled != nil {

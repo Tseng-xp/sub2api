@@ -38,6 +38,9 @@
           <span class="hidden sm:inline">{{ t('nav.docs') }}</span>
         </a>
 
+        <!-- Currency Switcher -->
+        <CurrencySwitcher />
+
         <!-- Language Switcher -->
         <LocaleSwitcher />
 

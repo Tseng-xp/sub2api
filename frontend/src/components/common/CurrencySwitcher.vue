@@ -58,9 +58,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import Icon from '@/components/icons/Icon.vue'
-import { useCurrencyStore, type DisplayCurrency } from '@/stores'
+import { useCurrency, type DisplayCurrency } from '@/composables/useCurrency'
 
-const { displayCurrency, exchangeRate, currencySymbol, setCurrency, setExchangeRate } = useCurrencyStore()
+const { displayCurrency, exchangeRate, currencySymbol, setCurrency, setExchangeRate } = useCurrency()
 
 const isOpen = ref(false)
 const dropdownRef = ref<HTMLElement | null>(null)
@@ -71,7 +71,7 @@ const currencies = [
 ]
 
 const currentCurrencyName = computed(() => {
-  const c = currencies.find(c => c.code === displayCurrency)
+  const c = currencies.find(c => c.code === displayCurrency.value)
   return c?.name || 'USD'
 })
 
@@ -80,7 +80,7 @@ function toggleDropdown() {
 }
 
 function selectCurrency(code: DisplayCurrency) {
-  if (code === displayCurrency) {
+  if (code === displayCurrency.value) {
     return
   }
   setCurrency(code)

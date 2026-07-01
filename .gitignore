@@ -129,6 +129,9 @@ backend/cmd/server/server
 deploy/docker-compose.override.yml
 .gocache/
 vite.config.js
+# 根目录编译的二进制文件
+sub2api
+sub2api_new
 docs/*
 !docs/PAYMENT.md
 !docs/PAYMENT_CN.md

@@ -837,6 +837,8 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		SettingKeyAffiliateEnabled,
 		SettingKeyRiskControlEnabled,
 		SettingKeyAllowUserViewErrorRequests,
+		SettingKeyDefaultDisplayCurrency,
+		SettingKeyDefaultExchangeRate,
 	}
 
 	settings, err := s.settingRepo.GetMultiple(ctx, keys)
@@ -951,7 +953,20 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		RiskControlEnabled: settings[SettingKeyRiskControlEnabled] == "true",
 
 		AllowUserViewErrorRequests: settings[SettingKeyAllowUserViewErrorRequests] == "true",
+
+		DefaultDisplayCurrency: s.getStringOrDefault(settings, SettingKeyDefaultDisplayCurrency, "USD"),
+		DefaultExchangeRate:    parseExchangeRate(settings[SettingKeyDefaultExchangeRate]),
 	}, nil
+}
+
+// parseExchangeRate parses the exchange rate from stored string.
+// Empty / invalid input falls back to 7.25.
+func parseExchangeRate(raw string) float64 {
+	v, err := strconv.ParseFloat(strings.TrimSpace(raw), 64)
+	if err != nil || v <= 0 {
+		return 7.25
+	}
+	return v
 }
 
 // channelMonitorIntervalMin / channelMonitorIntervalMax bound the default interval
@@ -1475,6 +1490,9 @@ type PublicSettingsInjectionPayload struct {
 	AffiliateEnabled                     bool `json:"affiliate_enabled"`
 	RiskControlEnabled                   bool `json:"risk_control_enabled"`
 	AllowUserViewErrorRequests           bool `json:"allow_user_view_error_requests"`
+
+	DefaultDisplayCurrency string  `json:"default_display_currency"`
+	DefaultExchangeRate    float64 `json:"default_exchange_rate"`
 }
 
 // GetPublicSettingsForInjection returns public settings in a format suitable for HTML injection.
@@ -1538,6 +1556,9 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 		AffiliateEnabled:                     settings.AffiliateEnabled,
 		RiskControlEnabled:                   settings.RiskControlEnabled,
 		AllowUserViewErrorRequests:           settings.AllowUserViewErrorRequests,
+
+		DefaultDisplayCurrency: settings.DefaultDisplayCurrency,
+		DefaultExchangeRate:    settings.DefaultExchangeRate,
 	}, nil
 }
 
@@ -2245,6 +2266,13 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 	}
 
 	updates[SettingKeyAllowUserViewErrorRequests] = strconv.FormatBool(settings.AllowUserViewErrorRequests)
+
+	if settings.DefaultDisplayCurrency != "" {
+		updates[SettingKeyDefaultDisplayCurrency] = settings.DefaultDisplayCurrency
+	}
+	if settings.DefaultExchangeRate > 0 {
+		updates[SettingKeyDefaultExchangeRate] = strconv.FormatFloat(settings.DefaultExchangeRate, 'f', -1, 64)
+	}
 
 	return updates, nil
 }
@@ -3792,6 +3820,9 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 	}
 
 	result.AllowUserViewErrorRequests = settings[SettingKeyAllowUserViewErrorRequests] == "true" // default false
+
+	result.DefaultDisplayCurrency = s.getStringOrDefault(settings, SettingKeyDefaultDisplayCurrency, "USD")
+	result.DefaultExchangeRate = parseExchangeRate(settings[SettingKeyDefaultExchangeRate])
 
 	return result
 }

@@ -14,22 +14,22 @@
           type="number" min="0" class="input mt-0.5 text-xs" :placeholder="'∞'" />
       </div>
       <div class="flex-1">
-        <label class="text-xs text-gray-400">{{ t('admin.channels.form.inputPrice') }} <span v-if="isEmpty" class="text-red-500">*</span> <span class="text-gray-300">$/M</span></label>
+        <label class="text-xs text-gray-400">{{ t('admin.channels.form.inputPrice', '输入') }} <span v-if="isEmpty" class="text-red-500">*</span> <span v-if="interval.input_price" class="text-gray-300">({{ currencyStore.formatAmount(Number(interval.input_price)) }}/M)</span></label>
         <input :value="interval.input_price" @input="emitField('input_price', ($event.target as HTMLInputElement).value)"
           type="number" step="any" min="0" class="input mt-0.5 text-xs" />
       </div>
       <div class="flex-1">
-        <label class="text-xs text-gray-400">{{ t('admin.channels.form.outputPrice') }} <span v-if="isEmpty" class="text-red-500">*</span> <span class="text-gray-300">$/M</span></label>
+        <label class="text-xs text-gray-400">{{ t('admin.channels.form.outputPrice', '输出') }} <span v-if="isEmpty" class="text-red-500">*</span> <span v-if="interval.output_price" class="text-gray-300">({{ currencyStore.formatAmount(Number(interval.output_price)) }}/M)</span></label>
         <input :value="interval.output_price" @input="emitField('output_price', ($event.target as HTMLInputElement).value)"
           type="number" step="any" min="0" class="input mt-0.5 text-xs" />
       </div>
       <div class="flex-1">
-        <label class="text-xs text-gray-400">{{ t('admin.channels.form.cacheWritePriceShort') }} <span class="text-gray-300">$/M</span></label>
+        <label class="text-xs text-gray-400">{{ t('admin.channels.form.cacheWritePrice', '缓存W') }} <span v-if="interval.cache_write_price" class="text-gray-300">({{ currencyStore.formatAmount(Number(interval.cache_write_price)) }}/M)</span></label>
         <input :value="interval.cache_write_price" @input="emitField('cache_write_price', ($event.target as HTMLInputElement).value)"
           type="number" step="any" min="0" class="input mt-0.5 text-xs" />
       </div>
       <div class="flex-1">
-        <label class="text-xs text-gray-400">{{ t('admin.channels.form.cacheReadPriceShort') }} <span class="text-gray-300">$/M</span></label>
+        <label class="text-xs text-gray-400">{{ t('admin.channels.form.cacheReadPrice', '缓存R') }} <span v-if="interval.cache_read_price" class="text-gray-300">({{ currencyStore.formatAmount(Number(interval.cache_read_price)) }}/M)</span></label>
         <input :value="interval.cache_read_price" @input="emitField('cache_read_price', ($event.target as HTMLInputElement).value)"
           type="number" step="any" min="0" class="input mt-0.5 text-xs" />
       </div>
@@ -55,7 +55,7 @@
           type="number" min="0" class="input mt-0.5 text-xs" :placeholder="'∞'" />
       </div>
       <div class="flex-1">
-        <label class="text-xs text-gray-400">{{ t('admin.channels.form.perRequestPrice') }} <span v-if="isEmpty" class="text-red-500">*</span> <span class="text-gray-300">$</span></label>
+        <label class="text-xs text-gray-400">{{ t('admin.channels.form.perRequestPrice', '单次价格') }} <span v-if="isEmpty" class="text-red-500">*</span> <span v-if="interval.per_request_price" class="text-gray-300">({{ currencyStore.formatAmount(Number(interval.per_request_price)) }})</span></label>
         <input :value="interval.per_request_price" @input="emitField('per_request_price', ($event.target as HTMLInputElement).value)"
           type="number" step="any" min="0" class="input mt-0.5 text-xs" />
       </div>
@@ -73,8 +73,10 @@ import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 import type { IntervalFormEntry } from './types'
 import type { BillingMode } from '@/api/admin/channels'
+import { useCurrencyStore } from '@/stores'
 
 const { t } = useI18n()
+const currencyStore = useCurrencyStore()
 
 const props = defineProps<{
   interval: IntervalFormEntry
@@ -86,7 +88,6 @@ const emit = defineEmits<{
   remove: []
 }>()
 
-// 检测所有价格字段是否都为空
 const isEmpty = computed(() => {
   const iv = props.interval
   return (iv.input_price == null || iv.input_price === '') &&
