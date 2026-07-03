@@ -46,5 +46,3 @@ jobs:
           build-args: |
             GOPROXY=https://goproxy.cn,direct
             GOSUMDB=sum.golang.google.cn
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
