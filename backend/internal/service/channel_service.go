@@ -275,6 +275,12 @@ func (s *ChannelService) buildCache(ctx context.Context) (*channelCache, error) 
 
 	cache := populateChannelCache(channels, groupPlatforms)
 	s.cache.Store(cache)
+	
+	slog.Info("channel cache rebuilt", 
+		"channel_count", len(channels),
+		"group_platform_count", len(groupPlatforms),
+	)
+	
 	return cache, nil
 }
 
@@ -469,15 +475,36 @@ func (s *ChannelService) GetChannelModelPricing(ctx context.Context, groupID int
 		return nil
 	}
 	if lk == nil {
+		slog.Debug("no active channel for group", "group_id", groupID)
 		return nil
 	}
 
 	modelLower := strings.ToLower(model)
+	slog.Debug("looking up channel pricing", 
+		"group_id", groupID, 
+		"platform", lk.platform, 
+		"model", model, 
+		"model_lower", modelLower,
+	)
+	
 	pricing := lookupPricingAcrossPlatforms(lk.cache, groupID, lk.platform, modelLower)
 	if pricing == nil {
+		slog.Debug("no channel pricing found", 
+			"group_id", groupID, 
+			"platform", lk.platform, 
+			"model", model,
+		)
 		return nil
 	}
 
+	slog.Debug("channel pricing found", 
+		"group_id", groupID, 
+		"platform", lk.platform, 
+		"model", model,
+		"input_price", pricing.InputPrice,
+		"output_price", pricing.OutputPrice,
+	)
+	
 	cp := pricing.Clone()
 	return &cp
 }
