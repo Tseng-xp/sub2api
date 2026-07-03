@@ -276,6 +276,20 @@ func (s *ChannelService) buildCache(ctx context.Context) (*channelCache, error) 
 	cache := populateChannelCache(channels, groupPlatforms)
 	s.cache.Store(cache)
 	
+	for _, ch := range channels {
+		for j := range ch.ModelPricing {
+			pricing := &ch.ModelPricing[j]
+			slog.Info("channel pricing loaded", 
+				"channel_id", ch.ID,
+				"channel_name", ch.Name,
+				"platform", pricing.Platform,
+				"models", pricing.Models,
+				"input_price", pricing.InputPrice,
+				"output_price", pricing.OutputPrice,
+			)
+		}
+	}
+	
 	slog.Info("channel cache rebuilt", 
 		"channel_count", len(channels),
 		"group_platform_count", len(groupPlatforms),
@@ -480,7 +494,7 @@ func (s *ChannelService) GetChannelModelPricing(ctx context.Context, groupID int
 	}
 
 	modelLower := strings.ToLower(model)
-	slog.Debug("looking up channel pricing", 
+	slog.Info("looking up channel pricing", 
 		"group_id", groupID, 
 		"platform", lk.platform, 
 		"model", model, 
@@ -489,7 +503,7 @@ func (s *ChannelService) GetChannelModelPricing(ctx context.Context, groupID int
 	
 	pricing := lookupPricingAcrossPlatforms(lk.cache, groupID, lk.platform, modelLower)
 	if pricing == nil {
-		slog.Debug("no channel pricing found", 
+		slog.Info("no channel pricing found", 
 			"group_id", groupID, 
 			"platform", lk.platform, 
 			"model", model,
@@ -497,7 +511,7 @@ func (s *ChannelService) GetChannelModelPricing(ctx context.Context, groupID int
 		return nil
 	}
 
-	slog.Debug("channel pricing found", 
+	slog.Info("channel pricing found", 
 		"group_id", groupID, 
 		"platform", lk.platform, 
 		"model", model,
