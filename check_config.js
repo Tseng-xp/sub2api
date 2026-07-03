@@ -1,6 +1,8 @@
 const { Client } = require('ssh2');
 
 const conn = new Client();
+const HOST = process.env.SERVER_HOST || '';
+const PASSWORD = process.env.SERVER_PASSWORD || '';
 
 conn.on('ready', function() {
   console.log('SSH connection ready');
@@ -49,9 +51,9 @@ conn.on('ready', function() {
 }).on('error', function(err) {
   console.error('Connection error:', err);
 }).connect({
-  host: '47.106.121.132',
+  host: HOST,
   port: 22,
   username: 'root',
-  password: 'Xn0753@#',
+  password: PASSWORD,
   readyTimeout: 10000
 });
