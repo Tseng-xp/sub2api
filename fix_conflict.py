@@ -1,8 +1,12 @@
 import paramiko
+import os
+
+host = os.environ.get("SERVER_HOST", "")
+password = os.environ.get("SERVER_PASSWORD", "")
 
 ssh = paramiko.SSHClient()
 ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-ssh.connect('47.106.121.132', username='root', password='Xn0753@#', timeout=30)
+ssh.connect(host, username='root', password=password, timeout=30)
 
 print("=" * 60)
 print("修复配置冲突")

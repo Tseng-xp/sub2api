@@ -3,9 +3,9 @@ import time
 import subprocess
 import os
 
-HOST = "47.106.121.132"
+HOST = os.environ.get("SERVER_HOST", "")
 USER = "root"
-PASSWORD = "Xn0753@#"
+PASSWORD = os.environ.get("SERVER_PASSWORD", "")
 
 def ssh_connect():
     max_retries = 5

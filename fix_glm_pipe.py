@@ -1,13 +1,16 @@
 import paramiko
 import time
+import os
 
 def ssh_connect():
     max_retries = 5
+    host = os.environ.get("SERVER_HOST", "")
+    password = os.environ.get("SERVER_PASSWORD", "")
     for i in range(max_retries):
         try:
             ssh = paramiko.SSHClient()
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            ssh.connect('47.106.121.132', username='root', password='Xn0753@#', timeout=30)
+            ssh.connect(host, username='root', password=password, timeout=30)
             print(f"✓ SSH连接成功 (尝试 {i+1}/{max_retries})")
             return ssh
         except Exception as e:
