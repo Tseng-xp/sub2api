@@ -39,17 +39,7 @@
           <Icon v-if="currency.code === displayCurrency" name="check" size="sm" class="ml-auto text-primary-500" />
         </button>
 
-        <div v-if="displayCurrency === 'CNY'" class="border-t border-gray-100 px-3 py-3 dark:border-dark-700">
-          <label class="text-xs font-medium text-gray-500 dark:text-gray-400 block mb-1">汇率 (1 USD = ? CNY)</label>
-          <input
-            type="number"
-            step="0.01"
-            min="0.01"
-            :value="exchangeRate"
-            @input="handleRateChange"
-            class="w-full rounded-md border border-gray-300 px-2 py-1 text-sm dark:border-dark-600 dark:bg-dark-700 dark:text-white"
-          />
-        </div>
+
       </div>
     </transition>
   </div>
@@ -60,7 +50,7 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import Icon from '@/components/icons/Icon.vue'
 import { useCurrency, type DisplayCurrency } from '@/composables/useCurrency'
 
-const { displayCurrency, exchangeRate, currencySymbol, setCurrency, setExchangeRate } = useCurrency()
+const { displayCurrency, currencySymbol, setCurrency } = useCurrency()
 
 const isOpen = ref(false)
 const dropdownRef = ref<HTMLElement | null>(null)
@@ -84,14 +74,6 @@ function selectCurrency(code: DisplayCurrency) {
     return
   }
   setCurrency(code)
-}
-
-function handleRateChange(event: Event) {
-  const target = event.target as HTMLInputElement
-  const rate = parseFloat(target.value)
-  if (!isNaN(rate) && rate > 0) {
-    setExchangeRate(rate)
-  }
 }
 
 function handleClickOutside(event: MouseEvent) {

@@ -1,14 +1,10 @@
-export function formatScaled(value: number | null, scale: number, symbol: string = '$', currency: string = 'USD', exchangeRate: number = 1.0, displayCurrency: string = 'USD'): string {
+export function formatScaled(value: number | null, scale: number, symbol: string = '$', currency: string = 'USD', exchangeRate: number = 0, displayCurrency: string = 'USD'): string {
   if (value == null) return '-'
   let raw = value * scale
   
-  if (exchangeRate <= 0) {
-    exchangeRate = 1.0
-  }
-  
-  if (currency === 'USD' && displayCurrency === 'CNY') {
+  if (exchangeRate > 0 && currency === 'USD' && displayCurrency === 'CNY') {
     raw = raw * exchangeRate
-  } else if (currency === 'CNY' && displayCurrency === 'USD') {
+  } else if (exchangeRate > 0 && currency === 'CNY' && displayCurrency === 'USD') {
     raw = raw / exchangeRate
   }
   

@@ -63,19 +63,20 @@ type PricingInput struct {
 }
 
 // getExchangeRate 获取人民币兑美元汇率（1 USD = X CNY）
+// 返回0表示汇率未配置，调用方需要处理这种情况
 func (r *ModelPricingResolver) getExchangeRate(ctx context.Context) float64 {
 	if r.settingService == nil {
-		slog.Warn("ModelPricingResolver: SettingService not initialized, using default exchange rate 1.0")
-		return 1.0
+		slog.Warn("ModelPricingResolver: SettingService not initialized, exchange rate not available")
+		return 0
 	}
 	settings, err := r.settingService.GetPublicSettings(ctx)
 	if err != nil {
 		slog.Warn("ModelPricingResolver: failed to get exchange rate from settings", "error", err)
-		return 1.0
+		return 0
 	}
 	if settings.DefaultExchangeRate <= 0 {
-		slog.Warn("ModelPricingResolver: exchange rate not set or invalid, using default 1.0")
-		return 1.0
+		slog.Warn("ModelPricingResolver: exchange rate not set or invalid, exchange rate not available")
+		return 0
 	}
 	return settings.DefaultExchangeRate
 }
@@ -92,7 +93,9 @@ func (r *ModelPricingResolver) convertToUSD(ctx context.Context, price *float64,
 	if currency == "CNY" {
 		rate := r.getExchangeRate(ctx)
 		if rate <= 0 {
-			return price
+			slog.Warn("ModelPricingResolver: exchange rate not configured, treating CNY price as USD", "price", *price)
+			usd := *price
+			return &usd
 		}
 		converted := *price / rate
 		return &converted

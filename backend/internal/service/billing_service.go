@@ -197,19 +197,20 @@ func (s *BillingService) SetSettingService(settingService *SettingService) {
 }
 
 // getExchangeRate 获取人民币兑美元汇率（1 USD = X CNY）
+// 返回0表示汇率未配置，调用方需要处理这种情况
 func (s *BillingService) getExchangeRate(ctx context.Context) float64 {
 	if s.settingService == nil {
-		log.Printf("[Billing] WARNING: SettingService not initialized, using default exchange rate 1.0")
-		return 1.0
+		log.Printf("[Billing] WARNING: SettingService not initialized, exchange rate not available")
+		return 0
 	}
 	settings, err := s.settingService.GetPublicSettings(ctx)
 	if err != nil {
-		log.Printf("[Billing] WARNING: Failed to get exchange rate from settings: %v, using default 1.0", err)
-		return 1.0
+		log.Printf("[Billing] WARNING: Failed to get exchange rate from settings: %v, exchange rate not available", err)
+		return 0
 	}
 	if settings.DefaultExchangeRate <= 0 {
-		log.Printf("[Billing] WARNING: Exchange rate not configured or invalid (%.2f), using default 1.0", settings.DefaultExchangeRate)
-		return 1.0
+		log.Printf("[Billing] WARNING: Exchange rate not configured or invalid (%.2f), exchange rate not available", settings.DefaultExchangeRate)
+		return 0
 	}
 	return settings.DefaultExchangeRate
 }
@@ -226,7 +227,9 @@ func (s *BillingService) convertPriceToUSD(ctx context.Context, price *float64, 
 	if currency == "CNY" {
 		rate := s.getExchangeRate(ctx)
 		if rate <= 0 {
-			return price
+			log.Printf("[Billing] WARNING: Exchange rate not configured, treating CNY price %.2f as USD", *price)
+			usd := *price
+			return &usd
 		}
 		converted := *price / rate
 		return &converted

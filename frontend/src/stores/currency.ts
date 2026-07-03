@@ -42,7 +42,7 @@ function formatNumberWith6Decimals(num: number): string {
 
 export const useCurrencyStore = defineStore('currency', () => {
   const displayCurrency = ref<DisplayCurrency | null>(loadCurrency())
-  const exchangeRate = ref<number>(1.0)
+  const exchangeRate = ref<number>(0)
   const initialized = ref(false)
 
   const effectiveCurrency = computed(() => {
@@ -112,6 +112,7 @@ export const useCurrencyStore = defineStore('currency', () => {
   function convertAmount(amount: number | null | undefined): number {
     if (amount === null || amount === undefined) return 0
     if (effectiveCurrency.value === 'USD') return amount
+    if (exchangeRate.value <= 0) return amount
     return amount * exchangeRate.value
   }
 
@@ -120,12 +121,12 @@ export const useCurrencyStore = defineStore('currency', () => {
       return effectiveCurrency.value === 'USD' ? '$0.000000' : '¥0.000000'
     }
 
-    const converted = effectiveCurrency.value === 'USD' 
-      ? amount 
-      : amount * exchangeRate.value
+    if (effectiveCurrency.value === 'USD' || exchangeRate.value <= 0) {
+      return '$' + formatNumberWith6Decimals(amount)
+    }
 
-    const symbol = effectiveCurrency.value === 'USD' ? '$' : '¥'
-    return symbol + formatNumberWith6Decimals(converted)
+    const converted = amount * exchangeRate.value
+    return '¥' + formatNumberWith6Decimals(converted)
   }
 
   return {
