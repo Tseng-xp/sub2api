@@ -133,8 +133,8 @@ func (r ChannelMappingResult) ToUsageFields(reqModel, upstreamModel string) Chan
 }
 
 const (
-	channelCacheTTL       = 10 * time.Minute
-	channelErrorTTL       = 5 * time.Second // DB 错误时的短缓存
+	channelCacheTTL       = 1 * time.Minute
+	channelErrorTTL       = 5 * time.Second
 	channelCacheDBTimeout = 10 * time.Second
 )
 
@@ -341,6 +341,11 @@ func populateChannelCache(channels []Channel, groupPlatforms map[int64]string) *
 		for _, gid := range ch.GroupIDs {
 			cache.channelByGroupID[gid] = ch
 			platform := groupPlatforms[gid]
+			if platform == "" {
+				slog.Warn("group platform not found, skipping pricing expansion", 
+					"group_id", gid, "channel_id", ch.ID, "channel_name", ch.Name)
+				continue
+			}
 			expandPricingToCache(cache, ch, gid, platform)
 			expandMappingToCache(cache, ch, gid, platform)
 		}
@@ -366,10 +371,21 @@ func (s *ChannelService) invalidateCache() {
 	s.cache.Store((*channelCache)(nil))
 	s.cacheSF.Forget("channel_cache")
 
-	// 主动重建缓存，确保 CRUD 后立即生效
 	if _, err := s.buildCache(context.Background()); err != nil {
 		slog.Warn("failed to rebuild channel cache after invalidation", "error", err)
 	}
+}
+
+// RefreshCache 主动刷新渠道缓存（公开方法，供外部调用）
+// 确保定价修改后立即生效，无需等待缓存 TTL 过期
+func (s *ChannelService) RefreshCache() error {
+	_, err := s.buildCache(context.Background())
+	if err != nil {
+		slog.Error("failed to refresh channel cache", "error", err)
+		return fmt.Errorf("refresh channel cache: %w", err)
+	}
+	slog.Info("channel cache refreshed manually")
+	return nil
 }
 
 // matchWildcard 在通配符定价中查找匹配项（最先匹配到优先）
