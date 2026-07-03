@@ -1851,7 +1851,7 @@ func newOpenAITokenImageChannelPricingResolverForTest(t *testing.T, groupID int6
 	cache.loadedAt = time.Now()
 	cs := &ChannelService{}
 	cs.cache.Store(cache)
-	return NewModelPricingResolver(cs, NewBillingService(&config.Config{}, nil))
+	return NewModelPricingResolver(cs, NewBillingService(&config.Config{}, nil), nil)
 }
 
 func TestGatewayServiceCalculateRecordUsageCost_ChannelImageBillingUsesImageCount(t *testing.T) {
