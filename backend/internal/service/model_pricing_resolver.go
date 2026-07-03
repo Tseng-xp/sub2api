@@ -42,9 +42,9 @@ type ResolvedPricing struct {
 // ModelPricingResolver 统一模型定价解析器。
 // 解析链：Channel → LiteLLM → Fallback。
 type ModelPricingResolver struct {
-	channelService  *ChannelService
-	billingService  *BillingService
-	settingService  *SettingService
+	channelService *ChannelService
+	billingService *BillingService
+	settingService *SettingService
 }
 
 // NewModelPricingResolver 创建定价解析器实例
