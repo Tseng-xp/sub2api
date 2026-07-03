@@ -104,16 +104,11 @@ func ResolveResponsesSupport(extra map[string]any) AccountResponsesSupport {
 // ShouldUseResponsesAPI 判断 OpenAI APIKey 账号的入站 /v1/chat/completions 请求
 // 是否应走"CC→Responses 转换 + 上游 /v1/responses"路径。
 //
-// 返回 true 的情况：
+// 关键不变量：未探测（标记缺失或类型不匹配）必须返回 true，保留与重构前老代码
+// 完全一致的存量账号行为（"现状即证据"原则）。
 //
-//	账号已探测确认支持 Responses
-//
-// 返回 false 的情况：
-//  1. 账号已探测确认不支持 Responses
-//  2. 账号未探测（标记缺失）——默认走 Chat Completions，兼容第三方上游（GLM、DeepSeek 等）
-//
-// 仅当账号已探测且确认支持时返回 true，否则调用方应走 CC 直转路径
+// 返回 false 的情况：账号已探测确认不支持 Responses，应走 CC 直转路径
 // （详见 internal/service/openai_gateway_chat_completions_raw.go）。
 func ShouldUseResponsesAPI(extra map[string]any) bool {
-	return ResolveResponsesSupport(extra) == ResponsesSupportYes
+	return ResolveResponsesSupport(extra) != ResponsesSupportNo
 }
