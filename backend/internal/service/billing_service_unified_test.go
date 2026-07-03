@@ -29,7 +29,7 @@ func TestCalculateCostUnified_NilResolver_FallsBackToOldPath(t *testing.T) {
 	require.NoError(t, err)
 
 	// Should match the old-path result exactly
-	expected, err := svc.calculateCostInternal("claude-sonnet-4", tokens, 1.0, "", nil)
+	expected, err := svc.calculateCostInternal(context.Background(), "claude-sonnet-4", tokens, 1.0, "", nil)
 	require.NoError(t, err)
 	require.InDelta(t, expected.TotalCost, cost.TotalCost, 1e-10)
 	require.InDelta(t, expected.ActualCost, cost.ActualCost, 1e-10)
@@ -39,7 +39,7 @@ func TestCalculateCostUnified_NilResolver_FallsBackToOldPath(t *testing.T) {
 
 func TestCalculateCostUnified_TokenMode(t *testing.T) {
 	bs := newTestBillingService()
-	resolver := NewModelPricingResolver(nil, bs)
+	resolver := NewModelPricingResolver(nil, bs, nil)
 
 	tokens := UsageTokens{InputTokens: 1000, OutputTokens: 500}
 	input := CostInput{
@@ -80,7 +80,7 @@ func TestCalculateCostUnified_PerRequestMode(t *testing.T) {
 	})
 
 	bs := newTestBillingService()
-	resolver := NewModelPricingResolver(cs, bs)
+	resolver := NewModelPricingResolver(cs, bs, nil)
 	groupID := int64(1)
 
 	input := CostInput{
@@ -125,7 +125,7 @@ func TestCalculateCostUnified_ImageMode(t *testing.T) {
 		cfg:            &config.Config{},
 		fallbackPrices: map[string]*ModelPricing{},
 	}
-	resolver := NewModelPricingResolver(cs, bs)
+	resolver := NewModelPricingResolver(cs, bs, nil)
 	groupID := int64(2)
 
 	input := CostInput{
@@ -151,7 +151,7 @@ func TestCalculateCostUnified_ImageMode(t *testing.T) {
 // 保存时强制 > 0；若 0 仍泄漏到计费层，按 0 计费（而非历史上的 1.0）。
 func TestCalculateCostUnified_RateMultiplierZeroProducesZero(t *testing.T) {
 	bs := newTestBillingService()
-	resolver := NewModelPricingResolver(nil, bs)
+	resolver := NewModelPricingResolver(nil, bs, nil)
 
 	tokens := UsageTokens{InputTokens: 1000, OutputTokens: 500}
 
@@ -171,7 +171,7 @@ func TestCalculateCostUnified_RateMultiplierZeroProducesZero(t *testing.T) {
 // 负数倍率按 0 计费，避免历史的 <=0 → 1.0 把配置异常静默按标准价扣费。
 func TestCalculateCostUnified_NegativeRateMultiplierClampedToZero(t *testing.T) {
 	bs := newTestBillingService()
-	resolver := NewModelPricingResolver(nil, bs)
+	resolver := NewModelPricingResolver(nil, bs, nil)
 
 	tokens := UsageTokens{InputTokens: 1000}
 
@@ -189,7 +189,7 @@ func TestCalculateCostUnified_NegativeRateMultiplierClampedToZero(t *testing.T) 
 
 func TestCalculateCostUnified_BillingModeFieldFilled(t *testing.T) {
 	bs := newTestBillingService()
-	resolver := NewModelPricingResolver(nil, bs)
+	resolver := NewModelPricingResolver(nil, bs, nil)
 
 	cost, err := bs.CalculateCostUnified(CostInput{
 		Ctx:            context.Background(),
@@ -204,7 +204,7 @@ func TestCalculateCostUnified_BillingModeFieldFilled(t *testing.T) {
 
 func TestCalculateCostUnified_UsesPreResolvedPricing(t *testing.T) {
 	bs := newTestBillingService()
-	resolver := NewModelPricingResolver(nil, bs)
+	resolver := NewModelPricingResolver(nil, bs, nil)
 
 	// Pre-resolve with per_request mode to verify it's used instead of re-resolving
 	preResolved := &ResolvedPricing{
