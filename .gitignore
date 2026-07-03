@@ -149,11 +149,14 @@ deploy_to_server.py
 backend/main_linux
 # 根目录临时脚本
 check_*.js
+check_*.py
 fix_*.js
 deploy_*.js
+deploy_*.py
 upload_*.js
 correct_*.js
 quick_*.js
 final_*.js
 simple_*.js
+test_*.py
 output/

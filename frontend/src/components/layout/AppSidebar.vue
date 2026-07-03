@@ -7,7 +7,12 @@
     ]"
   >
     <!-- Logo/Brand -->
-    <div class="sidebar-header" :class="{ 'sidebar-header-collapsed': sidebarCollapsed }">
+    <router-link
+      :to="authStore.isAuthenticated ? (isAdmin ? '/admin/dashboard' : '/dashboard') : '/login'"
+      class="sidebar-header flex items-center gap-3"
+      :class="{ 'sidebar-header-collapsed': sidebarCollapsed }"
+      active-class=""
+    >
       <!-- Custom Logo or Default Logo -->
       <div class="sidebar-logo flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl shadow-glow">
         <img v-if="settingsLoaded" :src="siteLogo || '/logo.png'" alt="Logo" class="h-full w-full object-contain" />
@@ -19,7 +24,7 @@
         <!-- Version Badge -->
         <VersionBadge :version="siteVersion" />
       </div>
-    </div>
+    </router-link>
 
     <!-- Navigation -->
     <nav class="sidebar-nav scrollbar-hide">
