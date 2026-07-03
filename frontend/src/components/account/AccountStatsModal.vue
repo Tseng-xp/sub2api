@@ -647,7 +647,7 @@ const lineChartOptions = computed(() => ({
       },
       title: {
         display: true,
-        text: t('usage.accountBilled') + ' (' + (currencyStore.displayCurrency === 'USD' ? 'USD' : 'CNY') + ')',
+        text: t('usage.accountBilled') + ' (' + (currencyStore.displayCurrency === 'CNY' ? 'CNY' : 'USD') + ')',
         color: '#3b82f6',
         font: {
           size: 11

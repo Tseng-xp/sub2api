@@ -143,3 +143,17 @@ docs/*
 frontend/coverage/
 aicodex
 output/
+# 临时部署脚本
+deploy.sh
+deploy_to_server.py
+backend/main_linux
+# 根目录临时脚本
+check_*.js
+fix_*.js
+deploy_*.js
+upload_*.js
+correct_*.js
+quick_*.js
+final_*.js
+simple_*.js
+output/

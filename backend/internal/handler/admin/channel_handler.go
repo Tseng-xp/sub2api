@@ -60,6 +60,7 @@ type channelModelPricingRequest struct {
 	Platform         string                   `json:"platform" binding:"omitempty,max=50"`
 	Models           []string                 `json:"models" binding:"required,min=1,max=100"`
 	BillingMode      string                   `json:"billing_mode" binding:"omitempty,oneof=token per_request image"`
+	Currency         string                   `json:"currency" binding:"omitempty,oneof=USD CNY"`
 	InputPrice       *float64                 `json:"input_price" binding:"omitempty,min=0"`
 	OutputPrice      *float64                 `json:"output_price" binding:"omitempty,min=0"`
 	CacheWritePrice  *float64                 `json:"cache_write_price" binding:"omitempty,min=0"`
@@ -111,6 +112,7 @@ type channelModelPricingResponse struct {
 	Platform         string                    `json:"platform"`
 	Models           []string                  `json:"models"`
 	BillingMode      string                    `json:"billing_mode"`
+	Currency         string                    `json:"currency"`
 	InputPrice       *float64                  `json:"input_price"`
 	OutputPrice      *float64                  `json:"output_price"`
 	CacheWritePrice  *float64                  `json:"cache_write_price"`
@@ -218,6 +220,7 @@ func pricingToResponse(p *service.ChannelModelPricing) channelModelPricingRespon
 		Platform:         platform,
 		Models:           models,
 		BillingMode:      billingMode,
+		Currency:         p.Currency,
 		InputPrice:       p.InputPrice,
 		OutputPrice:      p.OutputPrice,
 		CacheWritePrice:  p.CacheWritePrice,
@@ -251,6 +254,10 @@ func pricingRequestToService(reqs []channelModelPricingRequest) []service.Channe
 			billingMode = service.BillingModeToken
 		}
 		platform := r.Platform
+		currency := r.Currency
+		if currency == "" {
+			currency = "USD"
+		}
 		intervals := make([]service.PricingInterval, 0, len(r.Intervals))
 		for _, iv := range r.Intervals {
 			intervals = append(intervals, service.PricingInterval{
@@ -269,6 +276,7 @@ func pricingRequestToService(reqs []channelModelPricingRequest) []service.Channe
 			Platform:         platform,
 			Models:           r.Models,
 			BillingMode:      billingMode,
+			Currency:         currency,
 			InputPrice:       r.InputPrice,
 			OutputPrice:      r.OutputPrice,
 			CacheWritePrice:  r.CacheWritePrice,

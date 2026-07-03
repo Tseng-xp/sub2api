@@ -73,7 +73,7 @@
               class="mt-1"
             />
           </div>
-          <div class="w-40">
+          <div class="w-32">
             <label class="text-xs font-medium text-gray-500 dark:text-gray-400">
               {{ t('admin.channels.form.billingMode') }}
             </label>
@@ -81,6 +81,17 @@
               :modelValue="entry.billing_mode"
               @update:modelValue="emit('update', { ...entry, billing_mode: $event as BillingMode, intervals: [] })"
               :options="billingModeOptions"
+              class="mt-1"
+            />
+          </div>
+          <div class="w-32">
+            <label class="text-xs font-medium text-gray-500 dark:text-gray-400">
+              {{ t('admin.channels.form.currency', '货币') }}
+            </label>
+            <Select
+              :modelValue="entry.currency || 'USD'"
+              @update:modelValue="emit('update', { ...entry, currency: $event as string })"
+              :options="currencyOptions"
               class="mt-1"
             />
           </div>
@@ -243,6 +254,11 @@ const billingModeOptions = computed(() => [
   { value: 'token', label: t('admin.channels.billingMode.token') },
   { value: 'per_request', label: t('admin.channels.billingMode.perRequest') },
   { value: 'image', label: t('admin.channels.billingMode.image') }
+])
+
+const currencyOptions = computed(() => [
+  { value: 'USD', label: 'USD' },
+  { value: 'CNY', label: 'CNY' }
 ])
 
 const billingModeLabel = computed(() => {

@@ -68,7 +68,7 @@ func TestGetIntervalPricing_NoIntervals(t *testing.T) {
 		Intervals:   nil,
 	}
 
-	result := r.GetIntervalPricing(resolved, 50000)
+	result := r.GetIntervalPricing(context.Background(), resolved, 50000)
 	require.Equal(t, basePricing, result)
 }
 
@@ -86,13 +86,13 @@ func TestGetIntervalPricing_MatchesInterval(t *testing.T) {
 		},
 	}
 
-	result := r.GetIntervalPricing(resolved, 50000)
+	result := r.GetIntervalPricing(context.Background(), resolved, 50000)
 	require.NotNil(t, result)
 	require.InDelta(t, 1e-6, result.InputPricePerToken, 1e-12)
 	require.InDelta(t, 2e-6, result.OutputPricePerToken, 1e-12)
 	require.True(t, result.SupportsCacheBreakdown)
 
-	result2 := r.GetIntervalPricing(resolved, 200000)
+	result2 := r.GetIntervalPricing(context.Background(), resolved, 200000)
 	require.NotNil(t, result2)
 	require.InDelta(t, 3e-6, result2.InputPricePerToken, 1e-12)
 }
@@ -110,7 +110,7 @@ func TestGetIntervalPricing_NoMatch_FallsBackToBase(t *testing.T) {
 		},
 	}
 
-	result := r.GetIntervalPricing(resolved, 5000)
+	result := r.GetIntervalPricing(context.Background(), resolved, 5000)
 	require.Equal(t, basePricing, result)
 }
 
@@ -265,12 +265,12 @@ func TestResolve_WithChannelOverride_TokenWithIntervals(t *testing.T) {
 	require.Len(t, resolved.Intervals, 2)
 
 	// GetIntervalPricing should use channel intervals
-	iv := r.GetIntervalPricing(resolved, 50000)
+	iv := r.GetIntervalPricing(context.Background(), resolved, 50000)
 	require.NotNil(t, iv)
 	require.InDelta(t, 2e-6, iv.InputPricePerToken, 1e-12)
 	require.InDelta(t, 8e-6, iv.OutputPricePerToken, 1e-12)
 
-	iv2 := r.GetIntervalPricing(resolved, 200000)
+	iv2 := r.GetIntervalPricing(context.Background(), resolved, 200000)
 	require.NotNil(t, iv2)
 	require.InDelta(t, 4e-6, iv2.InputPricePerToken, 1e-12)
 	require.InDelta(t, 16e-6, iv2.OutputPricePerToken, 1e-12)
@@ -468,13 +468,13 @@ func TestGetIntervalPricing_WithChannelIntervals(t *testing.T) {
 	})
 
 	// Token count 50000 matches first interval
-	pricing := r.GetIntervalPricing(resolved, 50000)
+	pricing := r.GetIntervalPricing(context.Background(), resolved, 50000)
 	require.NotNil(t, pricing)
 	require.InDelta(t, 1e-6, pricing.InputPricePerToken, 1e-12)
 	require.InDelta(t, 5e-6, pricing.OutputPricePerToken, 1e-12)
 
 	// Token count 150000 matches second interval
-	pricing2 := r.GetIntervalPricing(resolved, 150000)
+	pricing2 := r.GetIntervalPricing(context.Background(), resolved, 150000)
 	require.NotNil(t, pricing2)
 	require.InDelta(t, 2e-6, pricing2.InputPricePerToken, 1e-12)
 	require.InDelta(t, 10e-6, pricing2.OutputPricePerToken, 1e-12)
@@ -498,7 +498,7 @@ func TestGetIntervalPricing_ChannelIntervalsNoMatch(t *testing.T) {
 	})
 
 	// Token count 1000 doesn't match any interval (1000 <= 50000 minTokens)
-	pricing := r.GetIntervalPricing(resolved, 1000)
+	pricing := r.GetIntervalPricing(context.Background(), resolved, 1000)
 	// Should fall back to BasePricing (from the billing service fallback)
 	require.NotNil(t, pricing)
 	require.Equal(t, resolved.BasePricing, pricing)
@@ -723,7 +723,7 @@ func TestApplyTokenOverrides_IntervalSetsImageOutputPriceExplicit(t *testing.T) 
 	require.Equal(t, 0.0, resolved.BasePricing.ImageOutputPricePerToken)
 
 	// intervalToModelPricing should also have explicit mark
-	pricing := r.GetIntervalPricing(resolved, 50000)
+	pricing := r.GetIntervalPricing(context.Background(), resolved, 50000)
 	require.True(t, pricing.ImageOutputPriceExplicit)
 	require.Equal(t, 0.0, pricing.ImageOutputPricePerToken)
 }

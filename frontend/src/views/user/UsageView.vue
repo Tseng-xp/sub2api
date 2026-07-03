@@ -539,6 +539,25 @@ const escapeCSVValue = (value: unknown): string => {
   return str
 }
 
+const formatNumberForCSV = (value: number) => {
+  const rounded = Math.round(value * 1000000) / 1000000
+  
+  if (Number.isInteger(rounded)) {
+    return rounded.toString()
+  }
+  
+  const str = rounded.toString()
+  const parts = str.split('.')
+  const integerPart = parts[0]
+  let decimalPart = parts[1] || ''
+  
+  while (decimalPart.length < 6) {
+    decimalPart += '0'
+  }
+  
+  return `${integerPart}.${decimalPart}`
+}
+
 const exportToCSV = async () => {
   if (pagination.total === 0) {
     appStore.showWarning(t('usage.noDataToExport'))
@@ -591,8 +610,8 @@ const exportToCSV = async () => {
       log.cache_read_tokens,
       log.cache_creation_tokens,
       log.rate_multiplier,
-      log.actual_cost.toFixed(8),
-      log.total_cost.toFixed(8),
+      formatNumberForCSV(log.actual_cost),
+      formatNumberForCSV(log.total_cost),
       log.first_token_ms ?? '',
       log.duration_ms ?? '',
     ].map(escapeCSVValue))

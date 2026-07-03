@@ -11,8 +11,20 @@ export function formatCacheTokens(tokens: number): string {
  * 自适应精度格式化倍率（确保小数值如 0.001 不被截断）
  */
 export function formatMultiplier(val: number): string {
-  if (val >= 0.01) return val.toFixed(2)
-  if (val >= 0.001) return val.toFixed(3)
-  if (val >= 0.0001) return val.toFixed(4)
-  return val.toPrecision(2)
+  const rounded = Math.round(val * 1000000) / 1000000
+  
+  if (Number.isInteger(rounded)) {
+    return rounded.toLocaleString('zh-CN')
+  }
+  
+  const str = rounded.toString()
+  const parts = str.split('.')
+  const integerPart = parseInt(parts[0], 10).toLocaleString('zh-CN')
+  let decimalPart = parts[1] || ''
+  
+  while (decimalPart.length < 6) {
+    decimalPart += '0'
+  }
+  
+  return `${integerPart}.${decimalPart}`
 }
