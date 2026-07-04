@@ -71,28 +71,24 @@
                 :value="model.pricing.input_price"
                 :unit="t(prefixKey('unitPerMillion'))"
                 :scale="perMillionScale"
-                :currency="model.pricing.currency"
               />
               <PricingRow
                 :label="t(prefixKey('outputPrice'))"
                 :value="model.pricing.output_price"
                 :unit="t(prefixKey('unitPerMillion'))"
                 :scale="perMillionScale"
-                :currency="model.pricing.currency"
               />
               <PricingRow
                 :label="t(prefixKey('cacheWritePrice'))"
                 :value="model.pricing.cache_write_price"
                 :unit="t(prefixKey('unitPerMillion'))"
                 :scale="perMillionScale"
-                :currency="model.pricing.currency"
               />
               <PricingRow
                 :label="t(prefixKey('cacheReadPrice'))"
                 :value="model.pricing.cache_read_price"
                 :unit="t(prefixKey('unitPerMillion'))"
                 :scale="perMillionScale"
-                :currency="model.pricing.currency"
               />
               <PricingRow
                 v-if="model.pricing.image_output_price != null && model.pricing.image_output_price > 0"
@@ -100,7 +96,6 @@
                 :value="model.pricing.image_output_price"
                 :unit="t(prefixKey('unitPerMillion'))"
                 :scale="perMillionScale"
-                :currency="model.pricing.currency"
               />
             </template>
 
@@ -113,7 +108,6 @@
               :value="model.pricing.per_request_price"
               :unit="t(prefixKey('unitPerRequest'))"
               :scale="1"
-              :currency="model.pricing.currency"
             />
 
             <PricingRow
@@ -125,7 +119,6 @@
               :value="model.pricing.image_output_price"
               :unit="t(prefixKey('unitPerRequest'))"
               :scale="1"
-              :currency="model.pricing.currency"
             />
 
             <div
@@ -168,7 +161,6 @@ import {
   BILLING_MODE_IMAGE,
   type BillingMode
 } from '@/constants/channel'
-import { useCurrencyStore } from '@/stores'
 // 复用 api/channels.ts 的用户侧最小形态 DTO。
 // admin 侧 ChannelModelPricing 字段更多，但结构上是用户 DTO 的超集，admin 视图传入可直接通过结构化子类型检查。
 import type { UserPricingInterval, UserSupportedModel } from '@/api/channels'
@@ -200,7 +192,6 @@ const props = withDefaults(
 const effectivePlatform = computed<string>(() => props.model.platform || props.platformHint || '')
 
 const { t } = useI18n()
-const currencyStore = useCurrencyStore()
 
 /** 按 token 定价展示时的换算单位：每百万 token。 */
 const perMillionScale = 1_000_000
@@ -242,13 +233,11 @@ function formatRange(min: number, max: number | null): string {
 }
 
 function formatInterval(iv: UserPricingInterval, mode: BillingMode): string {
-  const currency = props.model.pricing?.currency || 'USD'
-  const displayCurrency = currencyStore.displayCurrency || 'USD'
   if (mode === BILLING_MODE_PER_REQUEST || mode === BILLING_MODE_IMAGE) {
-    return formatScaled(iv.per_request_price, 1, currencyStore.currencySymbol, currency, currencyStore.exchangeRate, displayCurrency)
+    return formatScaled(iv.per_request_price, 1)
   }
-  const input = formatScaled(iv.input_price, perMillionScale, currencyStore.currencySymbol, currency, currencyStore.exchangeRate, displayCurrency)
-  const output = formatScaled(iv.output_price, perMillionScale, currencyStore.currencySymbol, currency, currencyStore.exchangeRate, displayCurrency)
+  const input = formatScaled(iv.input_price, perMillionScale)
+  const output = formatScaled(iv.output_price, perMillionScale)
   return `${input} / ${output}`
 }
 

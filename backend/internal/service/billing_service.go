@@ -168,7 +168,6 @@ var ErrModelPricingUnavailable = errors.New("pricing not found")
 type BillingService struct {
 	cfg            *config.Config
 	pricingService *PricingService
-	settingService *SettingService
 	fallbackPrices map[string]*ModelPricing // 硬编码回退价格
 
 	// fallbackWarnSeen 记录已打过 fallback 警告日志的(已小写化)模型名,
@@ -189,52 +188,6 @@ func NewBillingService(cfg *config.Config, pricingService *PricingService) *Bill
 	s.initFallbackPricing()
 
 	return s
-}
-
-// SetSettingService 设置 SettingService
-func (s *BillingService) SetSettingService(settingService *SettingService) {
-	s.settingService = settingService
-}
-
-// getExchangeRate 获取人民币兑美元汇率（1 USD = X CNY）
-// 返回0表示汇率未配置，调用方需要处理这种情况
-func (s *BillingService) getExchangeRate(ctx context.Context) float64 {
-	if s.settingService == nil {
-		log.Printf("[Billing] WARNING: SettingService not initialized, exchange rate not available")
-		return 0
-	}
-	settings, err := s.settingService.GetPublicSettings(ctx)
-	if err != nil {
-		log.Printf("[Billing] WARNING: Failed to get exchange rate from settings: %v, exchange rate not available", err)
-		return 0
-	}
-	if settings.DefaultExchangeRate <= 0 {
-		log.Printf("[Billing] WARNING: Exchange rate not configured or invalid (%.2f), exchange rate not available", settings.DefaultExchangeRate)
-		return 0
-	}
-	return settings.DefaultExchangeRate
-}
-
-// convertPriceToUSD 将价格从指定货币转换为 USD
-func (s *BillingService) convertPriceToUSD(ctx context.Context, price *float64, currency string) *float64 {
-	if price == nil {
-		return nil
-	}
-	if currency == "" || currency == "USD" {
-		usd := *price
-		return &usd
-	}
-	if currency == "CNY" {
-		rate := s.getExchangeRate(ctx)
-		if rate <= 0 {
-			log.Printf("[Billing] WARNING: Exchange rate not configured, treating CNY price %.2f as USD", *price)
-			usd := *price
-			return &usd
-		}
-		converted := *price / rate
-		return &converted
-	}
-	return price
 }
 
 // initFallbackPricing 初始化硬编码回退价格（当动态价格不可用时使用）
@@ -791,62 +744,33 @@ func (s *BillingService) GetModelPricing(model string) (*ModelPricing, error) {
 
 // GetModelPricingWithChannel 获取模型定价，渠道配置的价格覆盖默认值
 // 渠道存在时，未配置的图片输出价格归零（不回退到 LiteLLM）
-// 渠道定价会根据管理员设定的汇率转换为 USD
-func (s *BillingService) GetModelPricingWithChannel(ctx context.Context, model string, channelPricing *ChannelModelPricing) (*ModelPricing, error) {
-	basePricing, err := s.GetModelPricing(model)
+func (s *BillingService) GetModelPricingWithChannel(model string, channelPricing *ChannelModelPricing) (*ModelPricing, error) {
+	pricing, err := s.GetModelPricing(model)
 	if err != nil {
 		return nil, err
 	}
 	if channelPricing == nil {
-		return basePricing, nil
+		return pricing, nil
 	}
-
-	pricing := &ModelPricing{
-		InputPricePerToken:             basePricing.InputPricePerToken,
-		InputPricePerTokenPriority:     basePricing.InputPricePerTokenPriority,
-		ImageInputPricePerToken:        basePricing.ImageInputPricePerToken,
-		OutputPricePerToken:            basePricing.OutputPricePerToken,
-		OutputPricePerTokenPriority:    basePricing.OutputPricePerTokenPriority,
-		CacheCreationPricePerToken:     basePricing.CacheCreationPricePerToken,
-		CacheReadPricePerToken:         basePricing.CacheReadPricePerToken,
-		CacheReadPricePerTokenPriority: basePricing.CacheReadPricePerTokenPriority,
-		CacheCreation5mPrice:           basePricing.CacheCreation5mPrice,
-		CacheCreation1hPrice:           basePricing.CacheCreation1hPrice,
-		SupportsCacheBreakdown:         basePricing.SupportsCacheBreakdown,
-		LongContextInputThreshold:      basePricing.LongContextInputThreshold,
-		LongContextInputMultiplier:     basePricing.LongContextInputMultiplier,
-		LongContextOutputMultiplier:    basePricing.LongContextOutputMultiplier,
-		ImageOutputPricePerToken:       basePricing.ImageOutputPricePerToken,
-		ImageOutputPriceExplicit:       basePricing.ImageOutputPriceExplicit,
+	if channelPricing.InputPrice != nil {
+		pricing.InputPricePerToken = *channelPricing.InputPrice
+		pricing.InputPricePerTokenPriority = *channelPricing.InputPrice
 	}
-
-	currency := channelPricing.Currency
-
-	inputPrice := s.convertPriceToUSD(ctx, channelPricing.InputPrice, currency)
-	outputPrice := s.convertPriceToUSD(ctx, channelPricing.OutputPrice, currency)
-	cacheWritePrice := s.convertPriceToUSD(ctx, channelPricing.CacheWritePrice, currency)
-	cacheReadPrice := s.convertPriceToUSD(ctx, channelPricing.CacheReadPrice, currency)
-	imageOutputPrice := s.convertPriceToUSD(ctx, channelPricing.ImageOutputPrice, currency)
-
-	if inputPrice != nil {
-		pricing.InputPricePerToken = *inputPrice
-		pricing.InputPricePerTokenPriority = *inputPrice
+	if channelPricing.OutputPrice != nil {
+		pricing.OutputPricePerToken = *channelPricing.OutputPrice
+		pricing.OutputPricePerTokenPriority = *channelPricing.OutputPrice
 	}
-	if outputPrice != nil {
-		pricing.OutputPricePerToken = *outputPrice
-		pricing.OutputPricePerTokenPriority = *outputPrice
+	if channelPricing.CacheWritePrice != nil {
+		pricing.CacheCreationPricePerToken = *channelPricing.CacheWritePrice
+		pricing.CacheCreation5mPrice = *channelPricing.CacheWritePrice
+		pricing.CacheCreation1hPrice = *channelPricing.CacheWritePrice
 	}
-	if cacheWritePrice != nil {
-		pricing.CacheCreationPricePerToken = *cacheWritePrice
-		pricing.CacheCreation5mPrice = *cacheWritePrice
-		pricing.CacheCreation1hPrice = *cacheWritePrice
+	if channelPricing.CacheReadPrice != nil {
+		pricing.CacheReadPricePerToken = *channelPricing.CacheReadPrice
+		pricing.CacheReadPricePerTokenPriority = *channelPricing.CacheReadPrice
 	}
-	if cacheReadPrice != nil {
-		pricing.CacheReadPricePerToken = *cacheReadPrice
-		pricing.CacheReadPricePerTokenPriority = *cacheReadPrice
-	}
-	if imageOutputPrice != nil {
-		pricing.ImageOutputPricePerToken = *imageOutputPrice
+	if channelPricing.ImageOutputPrice != nil {
+		pricing.ImageOutputPricePerToken = *channelPricing.ImageOutputPrice
 	} else {
 		pricing.ImageOutputPricePerToken = 0
 	}
@@ -875,7 +799,7 @@ type CostInput struct {
 func (s *BillingService) CalculateCostUnified(input CostInput) (*CostBreakdown, error) {
 	if input.Resolver == nil {
 		// 无 Resolver，回退到旧路径
-		return s.calculateCostInternal(input.Ctx, input.Model, input.Tokens, input.RateMultiplier, input.ServiceTier, nil)
+		return s.calculateCostInternal(input.Model, input.Tokens, input.RateMultiplier, input.ServiceTier, nil)
 	}
 
 	// 优先使用预解析结果，避免重复 Resolve 调用
@@ -896,7 +820,7 @@ func (s *BillingService) CalculateCostUnified(input CostInput) (*CostBreakdown, 
 	var err error
 	switch resolved.Mode {
 	case BillingModePerRequest, BillingModeImage:
-		breakdown, err = s.calculatePerRequestCost(resolved, input, input.Ctx)
+		breakdown, err = s.calculatePerRequestCost(resolved, input)
 	default: // BillingModeToken
 		breakdown, err = s.calculateTokenCost(resolved, input)
 	}
@@ -913,7 +837,7 @@ func (s *BillingService) CalculateCostUnified(input CostInput) (*CostBreakdown, 
 func (s *BillingService) calculateTokenCost(resolved *ResolvedPricing, input CostInput) (*CostBreakdown, error) {
 	totalContext := input.Tokens.InputTokens + input.Tokens.CacheReadTokens
 
-	pricing := input.Resolver.GetIntervalPricing(input.Ctx, resolved, totalContext)
+	pricing := input.Resolver.GetIntervalPricing(resolved, totalContext)
 	if pricing == nil {
 		return nil, fmt.Errorf("no pricing available for model: %s: %w", input.Model, ErrModelPricingUnavailable)
 	}
@@ -1041,7 +965,7 @@ func (s *BillingService) computeCacheCreationCost(pricing *ModelPricing, tokens 
 }
 
 // calculatePerRequestCost 按次/图片计费
-func (s *BillingService) calculatePerRequestCost(resolved *ResolvedPricing, input CostInput, ctx context.Context) (*CostBreakdown, error) {
+func (s *BillingService) calculatePerRequestCost(resolved *ResolvedPricing, input CostInput) (*CostBreakdown, error) {
 	count := input.RequestCount
 	if count <= 0 {
 		count = 1
@@ -1050,12 +974,12 @@ func (s *BillingService) calculatePerRequestCost(resolved *ResolvedPricing, inpu
 	var unitPrice float64
 
 	if input.SizeTier != "" {
-		unitPrice = input.Resolver.GetRequestTierPrice(ctx, resolved, input.SizeTier)
+		unitPrice = input.Resolver.GetRequestTierPrice(resolved, input.SizeTier)
 	}
 
 	if unitPrice == 0 {
 		totalContext := input.Tokens.InputTokens + input.Tokens.CacheReadTokens
-		unitPrice = input.Resolver.GetRequestTierPriceByContext(ctx, resolved, totalContext)
+		unitPrice = input.Resolver.GetRequestTierPriceByContext(resolved, totalContext)
 	}
 
 	// 回退到默认按次价格
@@ -1074,18 +998,18 @@ func (s *BillingService) calculatePerRequestCost(resolved *ResolvedPricing, inpu
 
 // CalculateCost 计算使用费用
 func (s *BillingService) CalculateCost(model string, tokens UsageTokens, rateMultiplier float64) (*CostBreakdown, error) {
-	return s.calculateCostInternal(context.Background(), model, tokens, rateMultiplier, "", nil)
+	return s.calculateCostInternal(model, tokens, rateMultiplier, "", nil)
 }
 
 func (s *BillingService) CalculateCostWithServiceTier(model string, tokens UsageTokens, rateMultiplier float64, serviceTier string) (*CostBreakdown, error) {
-	return s.calculateCostInternal(context.Background(), model, tokens, rateMultiplier, serviceTier, nil)
+	return s.calculateCostInternal(model, tokens, rateMultiplier, serviceTier, nil)
 }
 
-func (s *BillingService) calculateCostInternal(ctx context.Context, model string, tokens UsageTokens, rateMultiplier float64, serviceTier string, channelPricing *ChannelModelPricing) (*CostBreakdown, error) {
+func (s *BillingService) calculateCostInternal(model string, tokens UsageTokens, rateMultiplier float64, serviceTier string, channelPricing *ChannelModelPricing) (*CostBreakdown, error) {
 	var pricing *ModelPricing
 	var err error
 	if channelPricing != nil {
-		pricing, err = s.GetModelPricingWithChannel(ctx, model, channelPricing)
+		pricing, err = s.GetModelPricingWithChannel(model, channelPricing)
 	} else {
 		pricing, err = s.GetModelPricing(model)
 	}

@@ -237,10 +237,6 @@ type SystemSettings struct {
 
 	// 允许终端用户在用量页查看自己的失败请求
 	AllowUserViewErrorRequests bool
-
-	// 货币显示设置
-	DefaultDisplayCurrency string  `json:"default_display_currency"`
-	DefaultExchangeRate    float64 `json:"default_exchange_rate"`
 }
 
 type DefaultSubscriptionSetting struct {
@@ -314,10 +310,6 @@ type PublicSettings struct {
 
 	// 允许终端用户在用量页查看自己的失败请求
 	AllowUserViewErrorRequests bool `json:"allow_user_view_error_requests"`
-
-	// 货币显示设置
-	DefaultDisplayCurrency string  `json:"default_display_currency"`
-	DefaultExchangeRate    float64 `json:"default_exchange_rate"`
 }
 
 type LoginAgreementDocument struct {

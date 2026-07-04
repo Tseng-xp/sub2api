@@ -1,4 +1,4 @@
-.PHONY: build build-backend build-frontend build-datamanagementd test test-backend test-frontend test-frontend-critical test-datamanagementd secret-scan
+.PHONY: build build-backend build-frontend build-datamanagementd test test-backend test-frontend test-frontend-critical test-datamanagementd secret-scan release release-build release-push
 
 FRONTEND_CRITICAL_VITEST := \
 	src/views/auth/__tests__/LinuxDoCallbackView.spec.ts \
@@ -42,3 +42,24 @@ test-datamanagementd:
 
 secret-scan:
 	@python3 tools/secret_scan.py
+
+# 一键构建发布：编译 + 提交 + 推送
+release: release-build release-push
+
+# 构建发布版本
+release-build: build-backend build-frontend
+	@echo "=== Build completed ==="
+
+# 提交并推送到 GitHub（使用 SSH 或已配置的凭据）
+release-push:
+	@echo "=== Checking git status ==="
+	@git status
+	@echo ""
+	@echo "=== Staging changes ==="
+	@git add -A
+	@echo ""
+	@echo "=== Committing changes ==="
+	@git commit -m "chore: release build" || echo "No changes to commit"
+	@echo ""
+	@echo "=== Pushing to GitHub ==="
+	@git push origin main

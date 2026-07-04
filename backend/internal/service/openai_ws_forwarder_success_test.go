@@ -139,7 +139,6 @@ func TestOpenAIGatewayService_Forward_WSv2_SuccessAndBindSticky(t *testing.T) {
 		},
 		Extra: map[string]any{
 			"responses_websockets_v2_enabled": true,
-			"openai_responses_supported":      true,
 		},
 	}
 
@@ -244,7 +243,7 @@ func TestOpenAIGatewayService_Forward_WSv2_UsesPatchedBodyAfterValidationDecode(
 			"api_key":  "sk-test",
 			"base_url": wsServer.URL,
 		},
-		Extra: map[string]any{"responses_websockets_v2_enabled": true, "openai_responses_supported": true},
+		Extra: map[string]any{"responses_websockets_v2_enabled": true},
 	}
 
 	body := []byte(`{"model":"gpt-5.4","stream":false,"max_completion_tokens":12,"tools":[{"type":"image_generation"}],"input":[{"type":"input_text","text":"hello"}]}`)
@@ -361,7 +360,6 @@ func TestOpenAIGatewayService_Forward_WSv2_ImageGenerationCountsOutputs(t *testi
 		},
 		Extra: map[string]any{
 			"responses_websockets_v2_enabled": true,
-			"openai_responses_supported":      true,
 		},
 	}
 
@@ -458,7 +456,6 @@ func TestOpenAIGatewayService_Forward_WSv2_RewriteModelAndToolCallsOnCompletedEv
 		},
 		Extra: map[string]any{
 			"responses_websockets_v2_enabled": true,
-			"openai_responses_supported":      true,
 		},
 	}
 
@@ -571,7 +568,6 @@ func TestOpenAIGatewayService_Forward_WSv2_PoolReuseNotOneToOne(t *testing.T) {
 		},
 		Extra: map[string]any{
 			"responses_websockets_v2_enabled": true,
-			"openai_responses_supported":      true,
 		},
 	}
 
@@ -649,7 +645,6 @@ func TestOpenAIGatewayService_Forward_WSv2_OAuthStoreFalseByDefault(t *testing.T
 		},
 		Extra: map[string]any{
 			"responses_websockets_v2_enabled": true,
-			"openai_responses_supported":      true,
 		},
 	}
 
@@ -740,7 +735,6 @@ func TestOpenAIGatewayService_Forward_WSv2_OAuthOriginatorCompatibility(t *testi
 				},
 				Extra: map[string]any{
 					"responses_websockets_v2_enabled": true,
-					"openai_responses_supported":      true,
 				},
 			}
 
@@ -802,7 +796,6 @@ func TestOpenAIGatewayService_Forward_WSv2_HeaderSessionFallbackFromPromptCacheK
 		},
 		Extra: map[string]any{
 			"responses_websockets_v2_enabled": true,
-			"openai_responses_supported":      true,
 		},
 	}
 
@@ -868,7 +861,6 @@ func TestOpenAIGatewayService_Forward_WSv2_ResponseDoneUsageParsed(t *testing.T)
 		},
 		Extra: map[string]any{
 			"responses_websockets_v2_enabled": true,
-			"openai_responses_supported":      true,
 		},
 	}
 
@@ -931,7 +923,6 @@ func TestOpenAIGatewayService_Forward_WSv1_Unsupported(t *testing.T) {
 		},
 		Extra: map[string]any{
 			"responses_websockets_v2_enabled": true,
-			"openai_responses_supported":      true,
 		},
 	}
 
@@ -1024,7 +1015,6 @@ func TestOpenAIGatewayService_Forward_WSv2_TurnStateAndMetadataReplayOnReconnect
 		},
 		Extra: map[string]any{
 			"responses_websockets_v2_enabled": true,
-			"openai_responses_supported":      true,
 		},
 	}
 
@@ -1117,7 +1107,6 @@ func TestOpenAIGatewayService_Forward_WSv2_GeneratePrewarm(t *testing.T) {
 		},
 		Extra: map[string]any{
 			"responses_websockets_v2_enabled": true,
-			"openai_responses_supported":      true,
 		},
 	}
 
@@ -1231,7 +1220,6 @@ func TestOpenAIGatewayService_Forward_WSv2_TurnMetadataInPayloadOnConnReuse(t *t
 		},
 		Extra: map[string]any{
 			"responses_websockets_v2_enabled": true,
-			"openai_responses_supported":      true,
 		},
 	}
 
@@ -1344,7 +1332,6 @@ func TestOpenAIGatewayService_Forward_WSv2StoreFalseSessionConnIsolation(t *test
 		},
 		Extra: map[string]any{
 			"responses_websockets_v2_enabled": true,
-			"openai_responses_supported":      true,
 		},
 	}
 
@@ -1452,7 +1439,6 @@ func TestOpenAIGatewayService_Forward_WSv2StoreFalseDisableForceNewConnAllowsReu
 		},
 		Extra: map[string]any{
 			"responses_websockets_v2_enabled": true,
-			"openai_responses_supported":      true,
 		},
 	}
 
@@ -1544,7 +1530,6 @@ func TestOpenAIGatewayService_Forward_WSv2ReadTimeoutAppliesPerRead(t *testing.T
 		},
 		Extra: map[string]any{
 			"responses_websockets_v2_enabled": true,
-			"openai_responses_supported":      true,
 		},
 	}
 

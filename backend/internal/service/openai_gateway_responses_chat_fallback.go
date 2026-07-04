@@ -67,20 +67,6 @@ func (s *OpenAIGatewayService) forwardResponsesViaRawChatCompletions(
 
 	billingModel := resolveOpenAIForwardModel(account, originalModel, "")
 	upstreamModel := normalizeOpenAIModelForUpstream(account, billingModel)
-
-	ctxAPIKey := getAPIKeyFromContext(c)
-	imageGenerationAllowed := GroupAllowsImageGeneration(nil)
-	if ctxAPIKey != nil {
-		imageGenerationAllowed = GroupAllowsImageGeneration(ctxAPIKey.Group)
-	}
-	imageIntent := IsImageGenerationIntent(openAIResponsesEndpoint, originalModel, body)
-	imageIntent = imageIntent || IsImageGenerationIntent(openAIResponsesEndpoint, billingModel, nil) || isOpenAIImageGenerationModel(upstreamModel)
-	if imageIntent && !imageGenerationAllowed {
-		MarkOpsClientBusinessLimited(c, OpsClientBusinessLimitedReasonLocalFeatureGate)
-		c.JSON(http.StatusForbidden, gin.H{"error": gin.H{"type": "permission_error", "message": ImageGenerationPermissionMessage()}})
-		return nil, errors.New("image generation disabled for group")
-	}
-
 	// 国产模型默认 effort 补充：需要 mappedModel 判定，推迟到 billingModel 算出之后。
 	reasoningEffort = ApplyThinkingEnabledFallback(reasoningEffort, body, billingModel)
 	chatReq.Model = upstreamModel

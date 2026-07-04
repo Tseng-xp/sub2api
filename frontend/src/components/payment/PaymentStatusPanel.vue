@@ -22,7 +22,7 @@
               </div>
               <div class="flex justify-between">
                 <span class="text-gray-500 dark:text-gray-400">{{ t('payment.orders.amount') }}</span>
-                <span class="font-medium text-gray-900 dark:text-white">{{ creditedAmountSymbol }}{{ formatAmount(paidOrder.amount) }}</span>
+                <span class="font-medium text-gray-900 dark:text-white">{{ creditedAmountSymbol }}{{ paidOrder.amount.toFixed(2) }}</span>
               </div>
               <div class="flex justify-between">
                 <span class="text-gray-500 dark:text-gray-400">{{ t('payment.orders.payAmount') }}</span>
@@ -217,25 +217,6 @@ const countdownDisplay = computed(() => {
 
 function formatGatewayAmount(value: number, currency?: string | null): string {
   return formatPaymentAmount(value, currency || paymentCurrency.value, localeCode.value)
-}
-
-function formatAmount(value: number): string {
-  const rounded = Math.round(value * 1000000) / 1000000
-  
-  if (Number.isInteger(rounded)) {
-    return rounded.toLocaleString('zh-CN')
-  }
-  
-  const str = rounded.toString()
-  const parts = str.split('.')
-  const integerPart = parseInt(parts[0], 10).toLocaleString('zh-CN')
-  let decimalPart = parts[1] || ''
-  
-  while (decimalPart.length < 6) {
-    decimalPart += '0'
-  }
-  
-  return `${integerPart}.${decimalPart}`
 }
 
 function isSuccessStatus(status: string | null | undefined): boolean {

@@ -44,15 +44,13 @@ type ResolvedPricing struct {
 type ModelPricingResolver struct {
 	channelService *ChannelService
 	billingService *BillingService
-	settingService *SettingService
 }
 
 // NewModelPricingResolver 创建定价解析器实例
-func NewModelPricingResolver(channelService *ChannelService, billingService *BillingService, settingService *SettingService) *ModelPricingResolver {
+func NewModelPricingResolver(channelService *ChannelService, billingService *BillingService) *ModelPricingResolver {
 	return &ModelPricingResolver{
 		channelService: channelService,
 		billingService: billingService,
-		settingService: settingService,
 	}
 }
 
@@ -60,49 +58,6 @@ func NewModelPricingResolver(channelService *ChannelService, billingService *Bil
 type PricingInput struct {
 	Model   string
 	GroupID *int64 // nil 表示不检查渠道
-}
-
-// getExchangeRate 获取人民币兑美元汇率（1 USD = X CNY）
-// 返回0表示汇率未配置，调用方需要处理这种情况
-func (r *ModelPricingResolver) getExchangeRate(ctx context.Context) float64 {
-	if r.settingService == nil {
-		slog.Warn("ModelPricingResolver: SettingService not initialized, exchange rate not available")
-		return 0
-	}
-	settings, err := r.settingService.GetPublicSettings(ctx)
-	if err != nil {
-		slog.Warn("ModelPricingResolver: failed to get exchange rate from settings", "error", err)
-		return 0
-	}
-	if settings.DefaultExchangeRate <= 0 {
-		slog.Warn("ModelPricingResolver: exchange rate not set or invalid, exchange rate not available")
-		return 0
-	}
-	return settings.DefaultExchangeRate
-}
-
-// convertToUSD 将价格从指定货币转换为 USD
-func (r *ModelPricingResolver) convertToUSD(ctx context.Context, price *float64, currency string) *float64 {
-	if price == nil {
-		return nil
-	}
-	if currency == "" || currency == "USD" {
-		usd := *price
-		return &usd
-	}
-	if currency == "CNY" {
-		rate := r.getExchangeRate(ctx)
-		if rate <= 0 {
-			slog.Warn("ModelPricingResolver: exchange rate not configured, treating CNY price as USD", "price", *price)
-			usd := *price
-			return &usd
-		}
-		converted := *price / rate
-		return &converted
-	}
-	slog.Warn("ModelPricingResolver: unsupported currency, treating as USD", "currency", currency)
-	usd := *price
-	return &usd
 }
 
 // Resolve 解析模型定价。
@@ -123,7 +78,7 @@ func (r *ModelPricingResolver) Resolve(ctx context.Context, input PricingInput) 
 					Source:         PricingSourceChannel,
 					channelPricing: chPricing,
 				}
-				r.applyRequestTierOverrides(ctx, chPricing, resolved)
+				r.applyRequestTierOverrides(chPricing, resolved)
 				return resolved
 			}
 		}
@@ -143,7 +98,7 @@ func (r *ModelPricingResolver) Resolve(ctx context.Context, input PricingInput) 
 	if chPricing != nil {
 		resolved.Source = PricingSourceChannel
 		resolved.channelPricing = chPricing
-		r.applyTokenOverrides(ctx, chPricing, resolved)
+		r.applyTokenOverrides(chPricing, resolved)
 	} else if input.GroupID != nil {
 		r.applyChannelOverrides(ctx, *input.GroupID, input.Model, resolved)
 	}
@@ -178,14 +133,14 @@ func (r *ModelPricingResolver) applyChannelOverrides(ctx context.Context, groupI
 
 	switch resolved.Mode {
 	case BillingModeToken:
-		r.applyTokenOverrides(ctx, chPricing, resolved)
+		r.applyTokenOverrides(chPricing, resolved)
 	case BillingModePerRequest, BillingModeImage:
-		r.applyRequestTierOverrides(ctx, chPricing, resolved)
+		r.applyRequestTierOverrides(chPricing, resolved)
 	}
 }
 
 // applyTokenOverrides 应用 token 模式的渠道覆盖
-func (r *ModelPricingResolver) applyTokenOverrides(ctx context.Context, chPricing *ChannelModelPricing, resolved *ResolvedPricing) {
+func (r *ModelPricingResolver) applyTokenOverrides(chPricing *ChannelModelPricing, resolved *ResolvedPricing) {
 	// 过滤掉所有价格字段都为空的无效 interval
 	validIntervals := filterValidIntervals(chPricing.Intervals)
 
@@ -196,9 +151,8 @@ func (r *ModelPricingResolver) applyTokenOverrides(ctx context.Context, chPricin
 		if resolved.BasePricing == nil {
 			resolved.BasePricing = &ModelPricing{}
 		}
-		imgPrice := r.convertToUSD(ctx, chPricing.ImageOutputPrice, chPricing.Currency)
-		if imgPrice != nil {
-			resolved.BasePricing.ImageOutputPricePerToken = *imgPrice
+		if chPricing.ImageOutputPrice != nil {
+			resolved.BasePricing.ImageOutputPricePerToken = *chPricing.ImageOutputPrice
 		} else {
 			resolved.BasePricing.ImageOutputPricePerToken = 0
 		}
@@ -211,32 +165,26 @@ func (r *ModelPricingResolver) applyTokenOverrides(ctx context.Context, chPricin
 		resolved.BasePricing = &ModelPricing{}
 	}
 
-	inputPrice := r.convertToUSD(ctx, chPricing.InputPrice, chPricing.Currency)
-	outputPrice := r.convertToUSD(ctx, chPricing.OutputPrice, chPricing.Currency)
-	cacheWritePrice := r.convertToUSD(ctx, chPricing.CacheWritePrice, chPricing.Currency)
-	cacheReadPrice := r.convertToUSD(ctx, chPricing.CacheReadPrice, chPricing.Currency)
-	imgOutputPrice := r.convertToUSD(ctx, chPricing.ImageOutputPrice, chPricing.Currency)
-
-	if inputPrice != nil {
-		resolved.BasePricing.InputPricePerToken = *inputPrice
-		resolved.BasePricing.InputPricePerTokenPriority = *inputPrice
+	if chPricing.InputPrice != nil {
+		resolved.BasePricing.InputPricePerToken = *chPricing.InputPrice
+		resolved.BasePricing.InputPricePerTokenPriority = *chPricing.InputPrice
 	}
-	if outputPrice != nil {
-		resolved.BasePricing.OutputPricePerToken = *outputPrice
-		resolved.BasePricing.OutputPricePerTokenPriority = *outputPrice
+	if chPricing.OutputPrice != nil {
+		resolved.BasePricing.OutputPricePerToken = *chPricing.OutputPrice
+		resolved.BasePricing.OutputPricePerTokenPriority = *chPricing.OutputPrice
 	}
-	if cacheWritePrice != nil {
-		resolved.BasePricing.CacheCreationPricePerToken = *cacheWritePrice
-		resolved.BasePricing.CacheCreation5mPrice = *cacheWritePrice
-		resolved.BasePricing.CacheCreation1hPrice = *cacheWritePrice
+	if chPricing.CacheWritePrice != nil {
+		resolved.BasePricing.CacheCreationPricePerToken = *chPricing.CacheWritePrice
+		resolved.BasePricing.CacheCreation5mPrice = *chPricing.CacheWritePrice
+		resolved.BasePricing.CacheCreation1hPrice = *chPricing.CacheWritePrice
 	}
-	if cacheReadPrice != nil {
-		resolved.BasePricing.CacheReadPricePerToken = *cacheReadPrice
-		resolved.BasePricing.CacheReadPricePerTokenPriority = *cacheReadPrice
+	if chPricing.CacheReadPrice != nil {
+		resolved.BasePricing.CacheReadPricePerToken = *chPricing.CacheReadPrice
+		resolved.BasePricing.CacheReadPricePerTokenPriority = *chPricing.CacheReadPrice
 	}
 	// 渠道定价覆盖一切：显式配置则用配置值，未配置则归零（不回退到 LiteLLM）
-	if imgOutputPrice != nil {
-		resolved.BasePricing.ImageOutputPricePerToken = *imgOutputPrice
+	if chPricing.ImageOutputPrice != nil {
+		resolved.BasePricing.ImageOutputPricePerToken = *chPricing.ImageOutputPrice
 	} else {
 		resolved.BasePricing.ImageOutputPricePerToken = 0
 	}
@@ -244,11 +192,10 @@ func (r *ModelPricingResolver) applyTokenOverrides(ctx context.Context, chPricin
 }
 
 // applyRequestTierOverrides 应用按次/图片模式的渠道覆盖
-func (r *ModelPricingResolver) applyRequestTierOverrides(ctx context.Context, chPricing *ChannelModelPricing, resolved *ResolvedPricing) {
+func (r *ModelPricingResolver) applyRequestTierOverrides(chPricing *ChannelModelPricing, resolved *ResolvedPricing) {
 	resolved.RequestTiers = filterValidIntervals(chPricing.Intervals)
-	perRequestPrice := r.convertToUSD(ctx, chPricing.PerRequestPrice, chPricing.Currency)
-	if perRequestPrice != nil {
-		resolved.DefaultPerRequestPrice = *perRequestPrice
+	if chPricing.PerRequestPrice != nil {
+		resolved.DefaultPerRequestPrice = *chPricing.PerRequestPrice
 	}
 }
 
@@ -268,7 +215,7 @@ func filterValidIntervals(intervals []PricingInterval) []PricingInterval {
 
 // GetIntervalPricing 根据 context token 数获取区间定价。
 // 如果有区间列表，找到匹配区间并构造 ModelPricing；否则直接返回 BasePricing。
-func (r *ModelPricingResolver) GetIntervalPricing(ctx context.Context, resolved *ResolvedPricing, totalContextTokens int) *ModelPricing {
+func (r *ModelPricingResolver) GetIntervalPricing(resolved *ResolvedPricing, totalContextTokens int) *ModelPricing {
 	if len(resolved.Intervals) == 0 {
 		return resolved.BasePricing
 	}
@@ -278,74 +225,45 @@ func (r *ModelPricingResolver) GetIntervalPricing(ctx context.Context, resolved 
 		return resolved.BasePricing
 	}
 
-	return r.intervalToModelPricing(ctx, iv, resolved.SupportsCacheBreakdown, resolved.channelPricing)
+	return intervalToModelPricing(iv, resolved.SupportsCacheBreakdown, resolved.channelPricing)
 }
 
 // intervalToModelPricing 将区间定价转换为 ModelPricing
-func (r *ModelPricingResolver) intervalToModelPricing(ctx context.Context, iv *PricingInterval, supportsCacheBreakdown bool, chPricing *ChannelModelPricing) *ModelPricing {
+func intervalToModelPricing(iv *PricingInterval, supportsCacheBreakdown bool, chPricing *ChannelModelPricing) *ModelPricing {
 	pricing := &ModelPricing{
 		SupportsCacheBreakdown: supportsCacheBreakdown,
 	}
-
-	var currency string
-	if chPricing != nil {
-		currency = chPricing.Currency
-	}
-
 	if iv.InputPrice != nil {
-		converted := r.convertToUSD(ctx, iv.InputPrice, currency)
-		if converted != nil {
-			pricing.InputPricePerToken = *converted
-			pricing.InputPricePerTokenPriority = *converted
-		}
+		pricing.InputPricePerToken = *iv.InputPrice
+		pricing.InputPricePerTokenPriority = *iv.InputPrice
 	}
 	if iv.OutputPrice != nil {
-		converted := r.convertToUSD(ctx, iv.OutputPrice, currency)
-		if converted != nil {
-			pricing.OutputPricePerToken = *converted
-			pricing.OutputPricePerTokenPriority = *converted
-		}
+		pricing.OutputPricePerToken = *iv.OutputPrice
+		pricing.OutputPricePerTokenPriority = *iv.OutputPrice
 	}
 	if iv.CacheWritePrice != nil {
-		converted := r.convertToUSD(ctx, iv.CacheWritePrice, currency)
-		if converted != nil {
-			pricing.CacheCreationPricePerToken = *converted
-			pricing.CacheCreation5mPrice = *converted
-			pricing.CacheCreation1hPrice = *converted
-		}
+		pricing.CacheCreationPricePerToken = *iv.CacheWritePrice
+		pricing.CacheCreation5mPrice = *iv.CacheWritePrice
+		pricing.CacheCreation1hPrice = *iv.CacheWritePrice
 	}
 	if iv.CacheReadPrice != nil {
-		converted := r.convertToUSD(ctx, iv.CacheReadPrice, currency)
-		if converted != nil {
-			pricing.CacheReadPricePerToken = *converted
-			pricing.CacheReadPricePerTokenPriority = *converted
-		}
+		pricing.CacheReadPricePerToken = *iv.CacheReadPrice
+		pricing.CacheReadPricePerTokenPriority = *iv.CacheReadPrice
 	}
 	// 渠道定价存在时，ImageOutputPrice 显式覆盖
 	if chPricing != nil {
 		pricing.ImageOutputPriceExplicit = true
 		if chPricing.ImageOutputPrice != nil {
-			converted := r.convertToUSD(ctx, chPricing.ImageOutputPrice, currency)
-			if converted != nil {
-				pricing.ImageOutputPricePerToken = *converted
-			}
+			pricing.ImageOutputPricePerToken = *chPricing.ImageOutputPrice
 		}
 	}
 	return pricing
 }
 
 // GetRequestTierPrice 根据层级标签获取按次价格
-func (r *ModelPricingResolver) GetRequestTierPrice(ctx context.Context, resolved *ResolvedPricing, tierLabel string) float64 {
-	var currency string
-	if resolved.channelPricing != nil {
-		currency = resolved.channelPricing.Currency
-	}
+func (r *ModelPricingResolver) GetRequestTierPrice(resolved *ResolvedPricing, tierLabel string) float64 {
 	for _, tier := range resolved.RequestTiers {
 		if tier.TierLabel == tierLabel && tier.PerRequestPrice != nil {
-			price := r.convertToUSD(ctx, tier.PerRequestPrice, currency)
-			if price != nil {
-				return *price
-			}
 			return *tier.PerRequestPrice
 		}
 	}
@@ -353,17 +271,9 @@ func (r *ModelPricingResolver) GetRequestTierPrice(ctx context.Context, resolved
 }
 
 // GetRequestTierPriceByContext 根据 context token 数获取按次价格
-func (r *ModelPricingResolver) GetRequestTierPriceByContext(ctx context.Context, resolved *ResolvedPricing, totalContextTokens int) float64 {
-	var currency string
-	if resolved.channelPricing != nil {
-		currency = resolved.channelPricing.Currency
-	}
+func (r *ModelPricingResolver) GetRequestTierPriceByContext(resolved *ResolvedPricing, totalContextTokens int) float64 {
 	iv := FindMatchingInterval(resolved.RequestTiers, totalContextTokens)
 	if iv != nil && iv.PerRequestPrice != nil {
-		price := r.convertToUSD(ctx, iv.PerRequestPrice, currency)
-		if price != nil {
-			return *price
-		}
 		return *iv.PerRequestPrice
 	}
 	return 0

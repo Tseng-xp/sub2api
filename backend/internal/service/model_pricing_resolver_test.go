@@ -26,7 +26,7 @@ func newTestBillingServiceForResolver() *BillingService {
 
 func TestResolve_NoGroupID(t *testing.T) {
 	bs := newTestBillingServiceForResolver()
-	r := NewModelPricingResolver(&ChannelService{}, bs, nil)
+	r := NewModelPricingResolver(&ChannelService{}, bs)
 
 	resolved := r.Resolve(context.Background(), PricingInput{
 		Model:   "claude-sonnet-4",
@@ -44,7 +44,7 @@ func TestResolve_NoGroupID(t *testing.T) {
 
 func TestResolve_UnknownModel(t *testing.T) {
 	bs := newTestBillingServiceForResolver()
-	r := NewModelPricingResolver(&ChannelService{}, bs, nil)
+	r := NewModelPricingResolver(&ChannelService{}, bs)
 
 	resolved := r.Resolve(context.Background(), PricingInput{
 		Model:   "unknown-model-xyz",
@@ -59,7 +59,7 @@ func TestResolve_UnknownModel(t *testing.T) {
 
 func TestGetIntervalPricing_NoIntervals(t *testing.T) {
 	bs := newTestBillingServiceForResolver()
-	r := NewModelPricingResolver(&ChannelService{}, bs, nil)
+	r := NewModelPricingResolver(&ChannelService{}, bs)
 
 	basePricing := &ModelPricing{InputPricePerToken: 5e-6}
 	resolved := &ResolvedPricing{
@@ -68,13 +68,13 @@ func TestGetIntervalPricing_NoIntervals(t *testing.T) {
 		Intervals:   nil,
 	}
 
-	result := r.GetIntervalPricing(context.Background(), resolved, 50000)
+	result := r.GetIntervalPricing(resolved, 50000)
 	require.Equal(t, basePricing, result)
 }
 
 func TestGetIntervalPricing_MatchesInterval(t *testing.T) {
 	bs := newTestBillingServiceForResolver()
-	r := NewModelPricingResolver(&ChannelService{}, bs, nil)
+	r := NewModelPricingResolver(&ChannelService{}, bs)
 
 	resolved := &ResolvedPricing{
 		Mode:                   BillingModeToken,
@@ -86,20 +86,20 @@ func TestGetIntervalPricing_MatchesInterval(t *testing.T) {
 		},
 	}
 
-	result := r.GetIntervalPricing(context.Background(), resolved, 50000)
+	result := r.GetIntervalPricing(resolved, 50000)
 	require.NotNil(t, result)
 	require.InDelta(t, 1e-6, result.InputPricePerToken, 1e-12)
 	require.InDelta(t, 2e-6, result.OutputPricePerToken, 1e-12)
 	require.True(t, result.SupportsCacheBreakdown)
 
-	result2 := r.GetIntervalPricing(context.Background(), resolved, 200000)
+	result2 := r.GetIntervalPricing(resolved, 200000)
 	require.NotNil(t, result2)
 	require.InDelta(t, 3e-6, result2.InputPricePerToken, 1e-12)
 }
 
 func TestGetIntervalPricing_NoMatch_FallsBackToBase(t *testing.T) {
 	bs := newTestBillingServiceForResolver()
-	r := NewModelPricingResolver(&ChannelService{}, bs, nil)
+	r := NewModelPricingResolver(&ChannelService{}, bs)
 
 	basePricing := &ModelPricing{InputPricePerToken: 99e-6}
 	resolved := &ResolvedPricing{
@@ -110,13 +110,13 @@ func TestGetIntervalPricing_NoMatch_FallsBackToBase(t *testing.T) {
 		},
 	}
 
-	result := r.GetIntervalPricing(context.Background(), resolved, 5000)
+	result := r.GetIntervalPricing(resolved, 5000)
 	require.Equal(t, basePricing, result)
 }
 
 func TestGetRequestTierPrice(t *testing.T) {
 	bs := newTestBillingServiceForResolver()
-	r := NewModelPricingResolver(&ChannelService{}, bs, nil)
+	r := NewModelPricingResolver(&ChannelService{}, bs)
 
 	resolved := &ResolvedPricing{
 		Mode: BillingModePerRequest,
@@ -126,14 +126,14 @@ func TestGetRequestTierPrice(t *testing.T) {
 		},
 	}
 
-	require.InDelta(t, 0.04, r.GetRequestTierPrice(context.Background(), resolved, "1K"), 1e-12)
-	require.InDelta(t, 0.08, r.GetRequestTierPrice(context.Background(), resolved, "2K"), 1e-12)
-	require.InDelta(t, 0.0, r.GetRequestTierPrice(context.Background(), resolved, "4K"), 1e-12)
+	require.InDelta(t, 0.04, r.GetRequestTierPrice(resolved, "1K"), 1e-12)
+	require.InDelta(t, 0.08, r.GetRequestTierPrice(resolved, "2K"), 1e-12)
+	require.InDelta(t, 0.0, r.GetRequestTierPrice(resolved, "4K"), 1e-12)
 }
 
 func TestGetRequestTierPriceByContext(t *testing.T) {
 	bs := newTestBillingServiceForResolver()
-	r := NewModelPricingResolver(&ChannelService{}, bs, nil)
+	r := NewModelPricingResolver(&ChannelService{}, bs)
 
 	resolved := &ResolvedPricing{
 		Mode: BillingModePerRequest,
@@ -143,13 +143,13 @@ func TestGetRequestTierPriceByContext(t *testing.T) {
 		},
 	}
 
-	require.InDelta(t, 0.05, r.GetRequestTierPriceByContext(context.Background(), resolved, 50000), 1e-12)
-	require.InDelta(t, 0.10, r.GetRequestTierPriceByContext(context.Background(), resolved, 200000), 1e-12)
+	require.InDelta(t, 0.05, r.GetRequestTierPriceByContext(resolved, 50000), 1e-12)
+	require.InDelta(t, 0.10, r.GetRequestTierPriceByContext(resolved, 200000), 1e-12)
 }
 
 func TestGetRequestTierPrice_NilPerRequestPrice(t *testing.T) {
 	bs := newTestBillingServiceForResolver()
-	r := NewModelPricingResolver(&ChannelService{}, bs, nil)
+	r := NewModelPricingResolver(&ChannelService{}, bs)
 
 	resolved := &ResolvedPricing{
 		Mode: BillingModePerRequest,
@@ -158,7 +158,7 @@ func TestGetRequestTierPrice_NilPerRequestPrice(t *testing.T) {
 		},
 	}
 
-	require.InDelta(t, 0.0, r.GetRequestTierPrice(context.Background(), resolved, "1K"), 1e-12)
+	require.InDelta(t, 0.0, r.GetRequestTierPrice(resolved, "1K"), 1e-12)
 }
 
 // ===========================================================================
@@ -186,7 +186,7 @@ func newResolverWithChannel(t *testing.T, pricing []ChannelModelPricing) *ModelP
 	}
 	cs := NewChannelService(repo, nil, nil, nil)
 	bs := newTestBillingServiceForResolver()
-	return NewModelPricingResolver(cs, bs, nil)
+	return NewModelPricingResolver(cs, bs)
 }
 
 // groupIDPtr returns a pointer to groupID 100 (the test constant).
@@ -265,12 +265,12 @@ func TestResolve_WithChannelOverride_TokenWithIntervals(t *testing.T) {
 	require.Len(t, resolved.Intervals, 2)
 
 	// GetIntervalPricing should use channel intervals
-	iv := r.GetIntervalPricing(context.Background(), resolved, 50000)
+	iv := r.GetIntervalPricing(resolved, 50000)
 	require.NotNil(t, iv)
 	require.InDelta(t, 2e-6, iv.InputPricePerToken, 1e-12)
 	require.InDelta(t, 8e-6, iv.OutputPricePerToken, 1e-12)
 
-	iv2 := r.GetIntervalPricing(context.Background(), resolved, 200000)
+	iv2 := r.GetIntervalPricing(resolved, 200000)
 	require.NotNil(t, iv2)
 	require.InDelta(t, 4e-6, iv2.InputPricePerToken, 1e-12)
 	require.InDelta(t, 16e-6, iv2.OutputPricePerToken, 1e-12)
@@ -327,8 +327,8 @@ func TestResolve_WithChannelOverride_PerRequest(t *testing.T) {
 	require.Len(t, resolved.RequestTiers, 2)
 
 	// Verify tier lookups
-	require.InDelta(t, 0.03, r.GetRequestTierPriceByContext(context.Background(), resolved, 50000), 1e-12)
-	require.InDelta(t, 0.10, r.GetRequestTierPriceByContext(context.Background(), resolved, 200000), 1e-12)
+	require.InDelta(t, 0.03, r.GetRequestTierPriceByContext(resolved, 50000), 1e-12)
+	require.InDelta(t, 0.10, r.GetRequestTierPriceByContext(resolved, 200000), 1e-12)
 }
 
 func TestResolve_WithChannelOverride_PerRequestNilPrice(t *testing.T) {
@@ -400,10 +400,10 @@ func TestResolve_WithChannelOverride_ImageTierLabels(t *testing.T) {
 		GroupID: groupIDPtr(),
 	})
 
-	require.InDelta(t, 0.04, r.GetRequestTierPrice(context.Background(), resolved, "1K"), 1e-12)
-	require.InDelta(t, 0.08, r.GetRequestTierPrice(context.Background(), resolved, "2K"), 1e-12)
-	require.InDelta(t, 0.16, r.GetRequestTierPrice(context.Background(), resolved, "4K"), 1e-12)
-	require.InDelta(t, 0.0, r.GetRequestTierPrice(context.Background(), resolved, "8K"), 1e-12) // not found
+	require.InDelta(t, 0.04, r.GetRequestTierPrice(resolved, "1K"), 1e-12)
+	require.InDelta(t, 0.08, r.GetRequestTierPrice(resolved, "2K"), 1e-12)
+	require.InDelta(t, 0.16, r.GetRequestTierPrice(resolved, "4K"), 1e-12)
+	require.InDelta(t, 0.0, r.GetRequestTierPrice(resolved, "8K"), 1e-12) // not found
 }
 
 // ---------------------------------------------------------------------------
@@ -468,13 +468,13 @@ func TestGetIntervalPricing_WithChannelIntervals(t *testing.T) {
 	})
 
 	// Token count 50000 matches first interval
-	pricing := r.GetIntervalPricing(context.Background(), resolved, 50000)
+	pricing := r.GetIntervalPricing(resolved, 50000)
 	require.NotNil(t, pricing)
 	require.InDelta(t, 1e-6, pricing.InputPricePerToken, 1e-12)
 	require.InDelta(t, 5e-6, pricing.OutputPricePerToken, 1e-12)
 
 	// Token count 150000 matches second interval
-	pricing2 := r.GetIntervalPricing(context.Background(), resolved, 150000)
+	pricing2 := r.GetIntervalPricing(resolved, 150000)
 	require.NotNil(t, pricing2)
 	require.InDelta(t, 2e-6, pricing2.InputPricePerToken, 1e-12)
 	require.InDelta(t, 10e-6, pricing2.OutputPricePerToken, 1e-12)
@@ -498,7 +498,7 @@ func TestGetIntervalPricing_ChannelIntervalsNoMatch(t *testing.T) {
 	})
 
 	// Token count 1000 doesn't match any interval (1000 <= 50000 minTokens)
-	pricing := r.GetIntervalPricing(context.Background(), resolved, 1000)
+	pricing := r.GetIntervalPricing(resolved, 1000)
 	// Should fall back to BasePricing (from the billing service fallback)
 	require.NotNil(t, pricing)
 	require.Equal(t, resolved.BasePricing, pricing)
@@ -519,7 +519,7 @@ func TestResolve_WithChannelOverride_CacheError(t *testing.T) {
 	}
 	cs := NewChannelService(repo, nil, nil, nil)
 	bs := newTestBillingServiceForResolver()
-	r := NewModelPricingResolver(cs, bs, nil)
+	r := NewModelPricingResolver(cs, bs)
 
 	gid := int64(100)
 	resolved := r.Resolve(context.Background(), PricingInput{
@@ -541,14 +541,14 @@ func TestResolve_WithChannelOverride_CacheError(t *testing.T) {
 
 func TestGetRequestTierPriceByContext_EmptyTiers(t *testing.T) {
 	bs := newTestBillingServiceForResolver()
-	r := NewModelPricingResolver(&ChannelService{}, bs, nil)
+	r := NewModelPricingResolver(&ChannelService{}, bs)
 
 	resolved := &ResolvedPricing{
 		Mode:         BillingModePerRequest,
 		RequestTiers: nil, // empty
 	}
 
-	price := r.GetRequestTierPriceByContext(context.Background(), resolved, 50000)
+	price := r.GetRequestTierPriceByContext(resolved, 50000)
 	require.InDelta(t, 0.0, price, 1e-12)
 
 	// Also test with explicit empty slice
@@ -557,13 +557,13 @@ func TestGetRequestTierPriceByContext_EmptyTiers(t *testing.T) {
 		RequestTiers: []PricingInterval{},
 	}
 
-	price2 := r.GetRequestTierPriceByContext(context.Background(), resolved2, 50000)
+	price2 := r.GetRequestTierPriceByContext(resolved2, 50000)
 	require.InDelta(t, 0.0, price2, 1e-12)
 }
 
 func TestGetRequestTierPriceByContext_ExactBoundary(t *testing.T) {
 	bs := newTestBillingServiceForResolver()
-	r := NewModelPricingResolver(&ChannelService{}, bs, nil)
+	r := NewModelPricingResolver(&ChannelService{}, bs)
 
 	resolved := &ResolvedPricing{
 		Mode: BillingModePerRequest,
@@ -576,13 +576,13 @@ func TestGetRequestTierPriceByContext_ExactBoundary(t *testing.T) {
 	// totalContextTokens = 128000 exactly:
 	// FindMatchingInterval checks: totalTokens > MinTokens && totalTokens <= MaxTokens
 	// For first interval: 128000 > 0 (true) && 128000 <= 128000 (true) → matches first interval
-	price := r.GetRequestTierPriceByContext(context.Background(), resolved, 128000)
+	price := r.GetRequestTierPriceByContext(resolved, 128000)
 	require.InDelta(t, 0.05, price, 1e-12)
 
 	// totalContextTokens = 128001 should match second interval
 	// For first interval: 128001 > 0 (true) && 128001 <= 128000 (false) → no match
 	// For second interval: 128001 > 128000 (true) && MaxTokens == nil → matches
-	price2 := r.GetRequestTierPriceByContext(context.Background(), resolved, 128001)
+	price2 := r.GetRequestTierPriceByContext(resolved, 128001)
 	require.InDelta(t, 0.10, price2, 1e-12)
 }
 
@@ -723,7 +723,7 @@ func TestApplyTokenOverrides_IntervalSetsImageOutputPriceExplicit(t *testing.T) 
 	require.Equal(t, 0.0, resolved.BasePricing.ImageOutputPricePerToken)
 
 	// intervalToModelPricing should also have explicit mark
-	pricing := r.GetIntervalPricing(context.Background(), resolved, 50000)
+	pricing := r.GetIntervalPricing(resolved, 50000)
 	require.True(t, pricing.ImageOutputPriceExplicit)
 	require.Equal(t, 0.0, pricing.ImageOutputPricePerToken)
 }

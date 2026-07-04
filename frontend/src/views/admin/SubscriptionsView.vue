@@ -227,9 +227,9 @@
                     ></div>
                   </div>
                   <span class="usage-amount">
-                    {{ currencyStore.formatAmount(row.daily_usage_usd) }}
+                    ${{ row.daily_usage_usd?.toFixed(2) || '0.00' }}
                     <span class="text-gray-400">/</span>
-                    {{ currencyStore.formatAmount(row.group?.daily_limit_usd) }}
+                    ${{ row.group?.daily_limit_usd?.toFixed(2) }}
                   </span>
                 </div>
                 <div class="reset-info" v-if="row.daily_window_start">
@@ -264,9 +264,9 @@
                     ></div>
                   </div>
                   <span class="usage-amount">
-                    {{ currencyStore.formatAmount(row.weekly_usage_usd) }}
+                    ${{ row.weekly_usage_usd?.toFixed(2) || '0.00' }}
                     <span class="text-gray-400">/</span>
-                    {{ currencyStore.formatAmount(row.group?.weekly_limit_usd) }}
+                    ${{ row.group?.weekly_limit_usd?.toFixed(2) }}
                   </span>
                 </div>
                 <div class="reset-info" v-if="row.weekly_window_start">
@@ -301,9 +301,9 @@
                     ></div>
                   </div>
                   <span class="usage-amount">
-                    {{ currencyStore.formatAmount(row.monthly_usage_usd) }}
+                    ${{ row.monthly_usage_usd?.toFixed(2) || '0.00' }}
                     <span class="text-gray-400">/</span>
-                    {{ currencyStore.formatAmount(row.group?.monthly_limit_usd) }}
+                    ${{ row.group?.monthly_limit_usd?.toFixed(2) }}
                   </span>
                 </div>
                 <div class="reset-info" v-if="row.monthly_window_start">
@@ -778,11 +778,9 @@ import GroupBadge from '@/components/common/GroupBadge.vue'
 import GroupOptionItem from '@/components/common/GroupOptionItem.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { getRemainingDurationParts, isOneTimeDailyQuota, type RemainingDurationParts } from '@/utils/subscriptionQuota'
-import { useCurrencyStore } from '@/stores'
 
 const { t } = useI18n()
 const appStore = useAppStore()
-const currencyStore = useCurrencyStore()
 
 interface GroupOption {
   value: number

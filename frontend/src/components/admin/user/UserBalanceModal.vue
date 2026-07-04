@@ -38,23 +38,16 @@ const emit = defineEmits(['close', 'success']); const { t } = useI18n(); const a
 const submitting = ref(false); const form = reactive({ amount: 0, notes: '' })
 watch(() => props.show, (v) => { if(v) { form.amount = 0; form.notes = '' } })
 
+// 格式化余额：显示完整精度，去除尾部多余的0
 const formatBalance = (value: number) => {
-  const rounded = Math.round(value * 1000000) / 1000000
-  
-  if (Number.isInteger(rounded)) {
-    return rounded.toLocaleString('zh-CN')
-  }
-  
-  const str = rounded.toString()
-  const parts = str.split('.')
-  const integerPart = parseInt(parts[0], 10).toLocaleString('zh-CN')
-  let decimalPart = parts[1] || ''
-  
-  while (decimalPart.length < 6) {
-    decimalPart += '0'
-  }
-  
-  return `${integerPart}.${decimalPart}`
+  if (value === 0) return '0.00'
+  // 最多保留8位小数，去除尾部的0
+  const formatted = value.toFixed(8).replace(/\.?0+$/, '')
+  // 确保至少有2位小数
+  const parts = formatted.split('.')
+  if (parts.length === 1) return formatted + '.00'
+  if (parts[1].length === 1) return formatted + '0'
+  return formatted
 }
 
 // 填入全部余额

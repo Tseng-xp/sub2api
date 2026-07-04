@@ -340,9 +340,6 @@ type PublicSettings struct {
 	RiskControlEnabled bool `json:"risk_control_enabled"`
 
 	AllowUserViewErrorRequests bool `json:"allow_user_view_error_requests"`
-
-	DefaultDisplayCurrency string  `json:"default_display_currency"`
-	DefaultExchangeRate    float64 `json:"default_exchange_rate"`
 }
 
 type LoginAgreementDocument struct {

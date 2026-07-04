@@ -61,10 +61,6 @@ func SetupRouter(
 		return nil
 	}))
 
-	// Serve docs from resources directory (must be before frontend middleware)
-	r.GET("/docs/*filepath", serveDocsWithCacheControl)
-	r.HEAD("/docs/*filepath", serveDocsWithCacheControl)
-
 	// Serve embedded frontend with settings injection if available
 	if web.HasEmbeddedFrontend() {
 		frontendServer, err := web.NewFrontendServer(settingService)

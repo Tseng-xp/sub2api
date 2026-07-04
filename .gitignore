@@ -34,7 +34,6 @@ backend/.gocache/
 node_modules/
 frontend/node_modules/
 frontend/dist/
-frontend/package-lock.json
 *.local
 *.tsbuildinfo
 vite.config.d.ts
@@ -130,39 +129,14 @@ backend/cmd/server/server
 deploy/docker-compose.override.yml
 .gocache/
 vite.config.js
-# 根目录编译的二进制文件
-sub2api
-sub2api_new
 docs/*
 !docs/PAYMENT.md
 !docs/PAYMENT_CN.md
 !docs/ADMIN_PAYMENT_INTEGRATION_API.md
-!docs/index.html
-!docs/zh/
-!docs/zh/*
 !docs/legal/
 !docs/legal/*.md
 .serena/
 .codex/
 frontend/coverage/
 aicodex
-output/
-# 临时部署脚本
-deploy.sh
-deploy_latest.sh
-deploy_*.sh
-deploy_to_server.py
-backend/main_linux
-# 根目录临时脚本
-check_*.js
-check_*.py
-fix_*.js
-deploy_*.js
-deploy_*.py
-upload_*.js
-correct_*.js
-quick_*.js
-final_*.js
-simple_*.js
-test_*.py
 output/

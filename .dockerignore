@@ -16,9 +16,6 @@ docs/
 # Docker build context even though docs/ is otherwise excluded.
 !docs/legal/
 !docs/legal/*.md
-!docs/index.html
-!docs/zh/
-!docs/zh/*
 
 # IDE
 .idea/

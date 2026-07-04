@@ -30,9 +30,11 @@
       <div class="mb-8 text-center">
         <!-- Custom Logo or Default Logo -->
         <template v-if="settingsLoaded">
-          <router-link to="/home" class="mb-4 inline-flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl shadow-lg shadow-primary-500/30">
+          <div
+            class="mb-4 inline-flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl shadow-lg shadow-primary-500/30"
+          >
             <img :src="siteLogo || '/logo.png'" alt="Logo" class="h-full w-full object-contain" />
-          </router-link>
+          </div>
           <h1 class="text-gradient mb-2 text-3xl font-bold">
             {{ siteName }}
           </h1>
@@ -55,10 +57,6 @@
       <!-- Copyright -->
       <div class="mt-8 text-center text-xs text-gray-400 dark:text-dark-500">
         &copy; {{ currentYear }} {{ siteName }}. All rights reserved.
-      <br />
-      <a href="https://beian.miit.gov.cn" target="_blank" rel="noopener noreferrer" class="text-gray-400 hover:text-gray-600 dark:text-dark-500 dark:hover:text-dark-300 transition-colors">
-        粤ICP备2025408634号-4
-      </a>
       </div>
     </div>
   </div>
@@ -68,21 +66,12 @@
 import { computed, onMounted } from 'vue'
 import { useAppStore } from '@/stores'
 import { sanitizeUrl } from '@/utils/url'
-import { useI18n } from 'vue-i18n'
 
 const appStore = useAppStore()
-const { locale } = useI18n()
 
 const siteName = computed(() => appStore.siteName || 'Sub2API')
 const siteLogo = computed(() => sanitizeUrl(appStore.siteLogo || '', { allowRelative: true, allowDataUrl: true }))
-const siteSubtitle = computed(() => {
-  const settings = appStore.cachedPublicSettings
-  if (!settings) return 'Subscription to API Conversion Platform'
-  const currentLocale = locale.value
-  if (currentLocale === 'zh' && settings.site_subtitle_zh) return settings.site_subtitle_zh
-  if (currentLocale === 'en' && settings.site_subtitle_en) return settings.site_subtitle_en
-  return settings.site_subtitle || 'Subscription to API Conversion Platform'
-})
+const siteSubtitle = computed(() => appStore.cachedPublicSettings?.site_subtitle || 'Subscription to API Conversion Platform')
 const settingsLoaded = computed(() => appStore.publicSettingsLoaded)
 
 const currentYear = computed(() => new Date().getFullYear())

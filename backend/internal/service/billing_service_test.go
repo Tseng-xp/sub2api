@@ -4,7 +4,6 @@ package service
 
 import (
 	"bytes"
-	"context"
 	"log"
 	"math"
 	"strings"
@@ -1236,7 +1235,7 @@ func TestGetModelPricing_MapsDynamicPriorityFieldsIntoBillingPricing(t *testing.
 func TestGetModelPricingWithChannel_NilChannelPricing_ReturnsOriginal(t *testing.T) {
 	svc := newTestBillingService()
 
-	pricing, err := svc.GetModelPricingWithChannel(context.Background(), "claude-sonnet-4", nil)
+	pricing, err := svc.GetModelPricingWithChannel("claude-sonnet-4", nil)
 	require.NoError(t, err)
 	require.NotNil(t, pricing)
 
@@ -1255,7 +1254,7 @@ func TestGetModelPricingWithChannel_OverrideInputPriceOnly(t *testing.T) {
 	chPricing := &ChannelModelPricing{
 		InputPrice: testPtrFloat64(99e-6),
 	}
-	pricing, err := svc.GetModelPricingWithChannel(context.Background(), "claude-sonnet-4", chPricing)
+	pricing, err := svc.GetModelPricingWithChannel("claude-sonnet-4", chPricing)
 	require.NoError(t, err)
 
 	// InputPrice overridden (both normal and priority)
@@ -1272,7 +1271,7 @@ func TestGetModelPricingWithChannel_OverrideOutputPriceOnly(t *testing.T) {
 	chPricing := &ChannelModelPricing{
 		OutputPrice: testPtrFloat64(88e-6),
 	}
-	pricing, err := svc.GetModelPricingWithChannel(context.Background(), "claude-sonnet-4", chPricing)
+	pricing, err := svc.GetModelPricingWithChannel("claude-sonnet-4", chPricing)
 	require.NoError(t, err)
 
 	// OutputPrice overridden
@@ -1293,7 +1292,7 @@ func TestGetModelPricingWithChannel_OverrideAllFields(t *testing.T) {
 		CacheReadPrice:   testPtrFloat64(1e-6),
 		ImageOutputPrice: testPtrFloat64(50e-6),
 	}
-	pricing, err := svc.GetModelPricingWithChannel(context.Background(), "claude-sonnet-4", chPricing)
+	pricing, err := svc.GetModelPricingWithChannel("claude-sonnet-4", chPricing)
 	require.NoError(t, err)
 
 	require.InDelta(t, 10e-6, pricing.InputPricePerToken, 1e-12)
@@ -1314,7 +1313,7 @@ func TestGetModelPricingWithChannel_CacheWritePriceAffects5mAnd1h(t *testing.T) 
 	chPricing := &ChannelModelPricing{
 		CacheWritePrice: testPtrFloat64(7e-6),
 	}
-	pricing, err := svc.GetModelPricingWithChannel(context.Background(), "claude-sonnet-4", chPricing)
+	pricing, err := svc.GetModelPricingWithChannel("claude-sonnet-4", chPricing)
 	require.NoError(t, err)
 
 	// CacheWritePrice should set all three: CacheCreationPricePerToken, 5m, and 1h
@@ -1329,7 +1328,7 @@ func TestGetModelPricingWithChannel_CacheReadPriceAffectsPriority(t *testing.T) 
 	chPricing := &ChannelModelPricing{
 		CacheReadPrice: testPtrFloat64(2e-6),
 	}
-	pricing, err := svc.GetModelPricingWithChannel(context.Background(), "claude-sonnet-4", chPricing)
+	pricing, err := svc.GetModelPricingWithChannel("claude-sonnet-4", chPricing)
 	require.NoError(t, err)
 
 	// CacheReadPrice should set both normal and priority
@@ -1343,7 +1342,7 @@ func TestGetModelPricingWithChannel_UnknownModelReturnsError(t *testing.T) {
 	chPricing := &ChannelModelPricing{
 		InputPrice: testPtrFloat64(1e-6),
 	}
-	pricing, err := svc.GetModelPricingWithChannel(context.Background(), "totally-unknown-model", chPricing)
+	pricing, err := svc.GetModelPricingWithChannel("totally-unknown-model", chPricing)
 	require.Error(t, err)
 	require.Nil(t, pricing)
 	require.Contains(t, err.Error(), "pricing not found")
@@ -1357,7 +1356,7 @@ func TestGetModelPricingWithChannel_NilImageOutputPriceZerosAndMarksExplicit(t *
 		OutputPrice: testPtrFloat64(20e-6),
 		// ImageOutputPrice intentionally nil
 	}
-	pricing, err := svc.GetModelPricingWithChannel(context.Background(), "claude-sonnet-4", chPricing)
+	pricing, err := svc.GetModelPricingWithChannel("claude-sonnet-4", chPricing)
 	require.NoError(t, err)
 
 	require.Equal(t, 0.0, pricing.ImageOutputPricePerToken)

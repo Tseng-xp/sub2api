@@ -97,14 +97,14 @@ func (s *FrontendServer) Middleware() gin.HandlerFunc {
 			cleanPath = "index.html"
 		}
 
-		// Try local override first (e.g., docs/)
-		if s.tryServeOverride(c, cleanPath) {
-			return
-		}
-
 		// For index.html or SPA routes, serve with injected settings
 		if cleanPath == "index.html" || !s.fileExists(cleanPath) {
 			s.serveIndexHTML(c)
+			return
+		}
+
+		// Try local override first
+		if s.tryServeOverride(c, cleanPath) {
 			return
 		}
 
@@ -126,30 +126,17 @@ func (s *FrontendServer) fileExists(path string) bool {
 // tryServeOverride checks if a local override file exists and serves it.
 // Files in overrideDir take precedence over embedded files.
 func (s *FrontendServer) tryServeOverride(c *gin.Context, cleanPath string) bool {
-	dirs := []string{s.overrideDir, "resources"}
-	for _, dir := range dirs {
-		if dir == "" {
-			continue
-		}
-		filePath := filepath.Join(dir, cleanPath)
-		info, err := os.Stat(filePath)
-		if err != nil {
-			continue
-		}
-		if info.IsDir() {
-			indexPath := filepath.Join(filePath, "index.html")
-			if _, err := os.Stat(indexPath); err == nil {
-				c.File(indexPath)
-				c.Abort()
-				return true
-			}
-			continue
-		}
-		c.File(filePath)
-		c.Abort()
-		return true
+	if s.overrideDir == "" {
+		return false
 	}
-	return false
+	filePath := filepath.Join(s.overrideDir, filepath.Clean("/"+cleanPath))
+	info, err := os.Stat(filePath)
+	if err != nil || info.IsDir() {
+		return false
+	}
+	c.File(filePath)
+	c.Abort()
+	return true
 }
 
 func (s *FrontendServer) serveIndexHTML(c *gin.Context) {
@@ -279,13 +266,12 @@ func ServeEmbeddedFrontend() gin.HandlerFunc {
 			cleanPath = "index.html"
 		}
 
-		// Try local override first (e.g., docs/)
-		if tryServeOverrideFile(c, overrideDir, cleanPath) {
-			return
-		}
-
 		if file, err := distFS.Open(cleanPath); err == nil {
 			_ = file.Close()
+			// Try local override first
+			if tryServeOverrideFile(c, overrideDir, cleanPath) {
+				return
+			}
 			fileServer.ServeHTTP(c.Writer, c.Request)
 			c.Abort()
 			return
@@ -297,30 +283,17 @@ func ServeEmbeddedFrontend() gin.HandlerFunc {
 
 // tryServeOverrideFile is a standalone version of tryServeOverride for legacy usage.
 func tryServeOverrideFile(c *gin.Context, overrideDir, cleanPath string) bool {
-	dirs := []string{overrideDir, "resources"}
-	for _, dir := range dirs {
-		if dir == "" {
-			continue
-		}
-		filePath := filepath.Join(dir, cleanPath)
-		info, err := os.Stat(filePath)
-		if err != nil {
-			continue
-		}
-		if info.IsDir() {
-			indexPath := filepath.Join(filePath, "index.html")
-			if _, err := os.Stat(indexPath); err == nil {
-				c.File(indexPath)
-				c.Abort()
-				return true
-			}
-			continue
-		}
-		c.File(filePath)
-		c.Abort()
-		return true
+	if overrideDir == "" {
+		return false
 	}
-	return false
+	filePath := filepath.Join(overrideDir, filepath.Clean("/"+cleanPath))
+	info, err := os.Stat(filePath)
+	if err != nil || info.IsDir() {
+		return false
+	}
+	c.File(filePath)
+	c.Abort()
+	return true
 }
 
 func shouldBypassEmbeddedFrontend(path string) bool {
@@ -334,9 +307,7 @@ func shouldBypassEmbeddedFrontend(path string) bool {
 		trimmed == "/health" ||
 		trimmed == "/responses" ||
 		strings.HasPrefix(trimmed, "/responses/") ||
-		strings.HasPrefix(trimmed, "/images/") ||
-		trimmed == "/docs" ||
-		strings.HasPrefix(trimmed, "/docs/")
+		strings.HasPrefix(trimmed, "/images/")
 }
 
 func serveIndexHTML(c *gin.Context, fsys fs.FS) {

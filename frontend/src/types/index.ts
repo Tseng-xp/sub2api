@@ -204,8 +204,6 @@ export interface PublicSettings {
   site_name: string
   site_logo: string
   site_subtitle: string
-  site_subtitle_zh?: string
-  site_subtitle_en?: string
   api_base_url: string
   contact_info: string
   doc_url: string
@@ -242,8 +240,6 @@ export interface PublicSettings {
   service_quota_enabled: boolean
   affiliate_enabled: boolean
   allow_user_view_error_requests?: boolean
-  default_display_currency?: string
-  default_exchange_rate?: number
 }
 
 export interface AuthResponse {
@@ -988,6 +984,7 @@ export interface AccountUsageInfo {
   five_hour: UsageProgress | null
   seven_day: UsageProgress | null
   seven_day_sonnet: UsageProgress | null
+  seven_day_fable?: UsageProgress | null
   gemini_shared_daily?: UsageProgress | null
   gemini_pro_daily?: UsageProgress | null
   gemini_flash_daily?: UsageProgress | null
@@ -1692,6 +1689,11 @@ export interface UserErrorRequest {
   message: string
   key_name: string
   key_deleted: boolean
+  client_ip?: string
+  group_name?: string
+  request_type?: number
+  stream?: boolean
+  user_agent?: string
 }
 
 export interface UserErrorRequestDetail extends UserErrorRequest {
@@ -1709,6 +1711,9 @@ export interface UserErrorListParams {
   status_code?: number
   category?: string
   api_key_id?: number
+  // 服务端排序,列白名单见后端 opsErrorLogsOrderBy(created_at/model/status_code)
+  sort_by?: string
+  sort_order?: 'asc' | 'desc'
 }
 
 export interface UsageQueryParams {

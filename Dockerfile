@@ -123,9 +123,6 @@ WORKDIR /app
 COPY --from=backend-builder --chown=sub2api:sub2api /app/sub2api /app/sub2api
 COPY --from=backend-builder --chown=sub2api:sub2api /app/backend/resources /app/resources
 
-# Copy docs directory to resources for serving via override mechanism
-COPY --chown=sub2api:sub2api docs/ /app/resources/docs/
-
 # Create data directory
 RUN mkdir -p /app/data && chown sub2api:sub2api /app/data
 

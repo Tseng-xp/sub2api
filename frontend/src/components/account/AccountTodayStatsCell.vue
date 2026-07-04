@@ -36,14 +36,14 @@
       <div class="flex items-center gap-1">
         <span class="text-gray-500 dark:text-gray-400">{{ t('usage.accountBilled') }}:</span>
         <span class="font-medium text-emerald-600 dark:text-emerald-400">{{
-          currencyStore.formatAmount(props.stats.cost)
+          formatCurrency(props.stats.cost)
         }}</span>
       </div>
       <!-- Cost (User/API Key) -->
       <div v-if="props.stats.user_cost != null" class="flex items-center gap-1">
         <span class="text-gray-500 dark:text-gray-400">{{ t('usage.userBilled') }}:</span>
         <span class="font-medium text-gray-700 dark:text-gray-300">{{
-          currencyStore.formatAmount(props.stats.user_cost)
+          formatCurrency(props.stats.user_cost)
         }}</span>
       </div>
     </div>
@@ -56,10 +56,7 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import type { WindowStats } from '@/types'
-import { formatNumber } from '@/utils/format'
-import { useCurrencyStore } from '@/stores'
-
-const currencyStore = useCurrencyStore()
+import { formatNumber, formatCurrency } from '@/utils/format'
 
 const props = withDefaults(
   defineProps<{

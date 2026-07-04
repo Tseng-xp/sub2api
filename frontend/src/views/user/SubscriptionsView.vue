@@ -107,8 +107,10 @@
                   {{ t('userSubscriptions.daily') }}
                 </span>
                 <span class="text-sm text-gray-500 dark:text-dark-400">
-                    {{ currencyStore.formatAmount(subscription.daily_usage_usd) }} / {{ currencyStore.formatAmount(subscription.group.daily_limit_usd) }}
-                  </span>
+                  ${{ (subscription.daily_usage_usd || 0).toFixed(2) }} / ${{
+                    subscription.group.daily_limit_usd.toFixed(2)
+                  }}
+                </span>
               </div>
               <div class="relative h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-dark-600">
                 <div
@@ -142,8 +144,10 @@
                   {{ t('userSubscriptions.weekly') }}
                 </span>
                 <span class="text-sm text-gray-500 dark:text-dark-400">
-                    {{ currencyStore.formatAmount(subscription.weekly_usage_usd) }} / {{ currencyStore.formatAmount(subscription.group.weekly_limit_usd) }}
-                  </span>
+                  ${{ (subscription.weekly_usage_usd || 0).toFixed(2) }} / ${{
+                    subscription.group.weekly_limit_usd.toFixed(2)
+                  }}
+                </span>
               </div>
               <div class="relative h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-dark-600">
                 <div
@@ -181,8 +185,10 @@
                   {{ t('userSubscriptions.monthly') }}
                 </span>
                 <span class="text-sm text-gray-500 dark:text-dark-400">
-                    {{ currencyStore.formatAmount(subscription.monthly_usage_usd) }} / {{ currencyStore.formatAmount(subscription.group.monthly_limit_usd) }}
-                  </span>
+                  ${{ (subscription.monthly_usage_usd || 0).toFixed(2) }} / ${{
+                    subscription.group.monthly_limit_usd.toFixed(2)
+                  }}
+                </span>
               </div>
               <div class="relative h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-dark-600">
                 <div
@@ -254,7 +260,6 @@ import { formatDateOnly } from '@/utils/format'
 import { hasPeakRate, formatPeakRateWindow, serverTimezoneLabel } from '@/utils/peak-rate'
 import { platformBorderClass, platformBadgeClass, platformButtonClass, platformLabel } from '@/utils/platformColors'
 import { getRemainingDurationParts, isOneTimeDailyQuota, type RemainingDurationParts } from '@/utils/subscriptionQuota'
-import { useCurrencyStore } from '@/stores'
 
 function platformAccentDotClass(p: string): string {
   switch (p) {
@@ -269,7 +274,6 @@ function platformAccentDotClass(p: string): string {
 const { t } = useI18n()
 const router = useRouter()
 const appStore = useAppStore()
-const currencyStore = useCurrencyStore()
 
 const subscriptions = ref<UserSubscription[]>([])
 const loading = ref(true)

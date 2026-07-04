@@ -133,8 +133,8 @@ func (r ChannelMappingResult) ToUsageFields(reqModel, upstreamModel string) Chan
 }
 
 const (
-	channelCacheTTL       = 1 * time.Minute
-	channelErrorTTL       = 5 * time.Second
+	channelCacheTTL       = 10 * time.Minute
+	channelErrorTTL       = 5 * time.Second // DB 错误时的短缓存
 	channelCacheDBTimeout = 10 * time.Second
 )
 
@@ -275,26 +275,6 @@ func (s *ChannelService) buildCache(ctx context.Context) (*channelCache, error) 
 
 	cache := populateChannelCache(channels, groupPlatforms)
 	s.cache.Store(cache)
-
-	for _, ch := range channels {
-		for j := range ch.ModelPricing {
-			pricing := &ch.ModelPricing[j]
-			slog.Info("channel pricing loaded",
-				"channel_id", ch.ID,
-				"channel_name", ch.Name,
-				"platform", pricing.Platform,
-				"models", pricing.Models,
-				"input_price", pricing.InputPrice,
-				"output_price", pricing.OutputPrice,
-			)
-		}
-	}
-
-	slog.Info("channel cache rebuilt",
-		"channel_count", len(channels),
-		"group_platform_count", len(groupPlatforms),
-	)
-
 	return cache, nil
 }
 
@@ -341,11 +321,6 @@ func populateChannelCache(channels []Channel, groupPlatforms map[int64]string) *
 		for _, gid := range ch.GroupIDs {
 			cache.channelByGroupID[gid] = ch
 			platform := groupPlatforms[gid]
-			if platform == "" {
-				slog.Warn("group platform not found, skipping pricing expansion",
-					"group_id", gid, "channel_id", ch.ID, "channel_name", ch.Name)
-				continue
-			}
 			expandPricingToCache(cache, ch, gid, platform)
 			expandMappingToCache(cache, ch, gid, platform)
 		}
@@ -371,21 +346,10 @@ func (s *ChannelService) invalidateCache() {
 	s.cache.Store((*channelCache)(nil))
 	s.cacheSF.Forget("channel_cache")
 
+	// 主动重建缓存，确保 CRUD 后立即生效
 	if _, err := s.buildCache(context.Background()); err != nil {
 		slog.Warn("failed to rebuild channel cache after invalidation", "error", err)
 	}
-}
-
-// RefreshCache 主动刷新渠道缓存（公开方法，供外部调用）
-// 确保定价修改后立即生效，无需等待缓存 TTL 过期
-func (s *ChannelService) RefreshCache() error {
-	_, err := s.buildCache(context.Background())
-	if err != nil {
-		slog.Error("failed to refresh channel cache", "error", err)
-		return fmt.Errorf("refresh channel cache: %w", err)
-	}
-	slog.Info("channel cache refreshed manually")
-	return nil
 }
 
 // matchWildcard 在通配符定价中查找匹配项（最先匹配到优先）
@@ -505,35 +469,14 @@ func (s *ChannelService) GetChannelModelPricing(ctx context.Context, groupID int
 		return nil
 	}
 	if lk == nil {
-		slog.Debug("no active channel for group", "group_id", groupID)
 		return nil
 	}
 
 	modelLower := strings.ToLower(model)
-	slog.Info("looking up channel pricing",
-		"group_id", groupID,
-		"platform", lk.platform,
-		"model", model,
-		"model_lower", modelLower,
-	)
-
 	pricing := lookupPricingAcrossPlatforms(lk.cache, groupID, lk.platform, modelLower)
 	if pricing == nil {
-		slog.Info("no channel pricing found",
-			"group_id", groupID,
-			"platform", lk.platform,
-			"model", model,
-		)
 		return nil
 	}
-
-	slog.Info("channel pricing found",
-		"group_id", groupID,
-		"platform", lk.platform,
-		"model", model,
-		"input_price", pricing.InputPrice,
-		"output_price", pricing.OutputPrice,
-	)
 
 	cp := pricing.Clone()
 	return &cp

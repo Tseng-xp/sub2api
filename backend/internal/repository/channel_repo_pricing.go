@@ -16,7 +16,7 @@ import (
 
 func (r *channelRepository) ListModelPricing(ctx context.Context, channelID int64) ([]service.ChannelModelPricing, error) {
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT id, channel_id, models, input_price, output_price, cache_write_price, cache_read_price, image_output_price, created_at, updated_at, billing_mode, per_request_price, platform
+		`SELECT id, channel_id, platform, models, billing_mode, input_price, output_price, cache_write_price, cache_read_price, image_output_price, per_request_price, created_at, updated_at
 		 FROM channel_model_pricing WHERE channel_id = $1 ORDER BY id`, channelID,
 	)
 	if err != nil {
@@ -91,7 +91,7 @@ func (r *channelRepository) ReplaceModelPricing(ctx context.Context, channelID i
 // batchLoadModelPricing 批量加载多个渠道的模型定价（含区间）
 func (r *channelRepository) batchLoadModelPricing(ctx context.Context, channelIDs []int64) (map[int64][]service.ChannelModelPricing, error) {
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT id, channel_id, models, input_price, output_price, cache_write_price, cache_read_price, image_output_price, created_at, updated_at, billing_mode, per_request_price, platform
+		`SELECT id, channel_id, platform, models, billing_mode, input_price, output_price, cache_write_price, cache_read_price, image_output_price, per_request_price, created_at, updated_at
 		 FROM channel_model_pricing WHERE channel_id = ANY($1) ORDER BY channel_id, id`,
 		pq.Array(channelIDs),
 	)
@@ -170,9 +170,9 @@ func scanModelPricingRows(rows *sql.Rows) ([]service.ChannelModelPricing, []int6
 		var p service.ChannelModelPricing
 		var modelsJSON []byte
 		if err := rows.Scan(
-			&p.ID, &p.ChannelID, &modelsJSON, &p.InputPrice, &p.OutputPrice,
-			&p.CacheWritePrice, &p.CacheReadPrice, &p.ImageOutputPrice,
-			&p.CreatedAt, &p.UpdatedAt, &p.BillingMode, &p.PerRequestPrice, &p.Platform,
+			&p.ID, &p.ChannelID, &p.Platform, &modelsJSON, &p.BillingMode,
+			&p.InputPrice, &p.OutputPrice, &p.CacheWritePrice, &p.CacheReadPrice,
+			&p.ImageOutputPrice, &p.PerRequestPrice, &p.CreatedAt, &p.UpdatedAt,
 		); err != nil {
 			return nil, nil, fmt.Errorf("scan model pricing: %w", err)
 		}

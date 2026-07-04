@@ -8,9 +8,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { formatScaled } from '@/utils/pricing'
-import { useCurrencyStore } from '@/stores'
-
-const currencyStore = useCurrencyStore()
 
 const props = withDefaults(
   defineProps<{
@@ -18,20 +15,11 @@ const props = withDefaults(
     value: number | null
     unit: string
     scale: number
-    currency?: string
   }>(),
-  { value: null, currency: 'USD' }
+  { value: null }
 )
 
-const display = computed(() => {
-  if (props.value == null) return '-'
-  return `${formatScaled(
-    props.value, 
-    props.scale, 
-    currencyStore.currencySymbol, 
-    props.currency,
-    currencyStore.exchangeRate,
-    currencyStore.displayCurrency || 'USD'
-  )} ${props.unit}`
-})
+const display = computed(() =>
+  props.value == null ? '-' : `${formatScaled(props.value, props.scale)} ${props.unit}`
+)
 </script>

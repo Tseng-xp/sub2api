@@ -14,12 +14,12 @@
     </template>
     <template #cell-pay_amount="{ value, row }">
       <div class="text-sm">
-        <span class="font-medium text-gray-900 dark:text-white">{{ paymentAmountSymbol(row) }}{{ formatAmount(value) }}</span>
+        <span class="font-medium text-gray-900 dark:text-white">{{ paymentAmountSymbol(row) }}{{ value.toFixed(2) }}</span>
         <span v-if="row.fee_rate > 0" class="ml-1 text-xs text-gray-400" :title="t('payment.orders.fee') + ': ' + row.fee_rate + '%'">
           ({{ t('payment.orders.fee') }} {{ row.fee_rate }}%)
         </span>
         <div v-if="row.amount !== row.pay_amount" class="text-xs text-gray-500">
-          {{ t('payment.orders.creditedAmount') }}: {{ creditedAmountSymbol }}{{ formatAmount(row.amount) }}
+          {{ t('payment.orders.creditedAmount') }}: {{ creditedAmountSymbol }}{{ row.amount.toFixed(2) }}
         </div>
       </div>
     </template>
@@ -61,25 +61,6 @@ const creditedAmountSymbol = currencySymbol('USD')
 
 function paymentAmountSymbol(order: PaymentOrder): string {
   return currencySymbol(order.currency)
-}
-
-function formatAmount(value: number): string {
-  const rounded = Math.round(value * 1000000) / 1000000
-  
-  if (Number.isInteger(rounded)) {
-    return rounded.toLocaleString('zh-CN')
-  }
-  
-  const str = rounded.toString()
-  const parts = str.split('.')
-  const integerPart = parseInt(parts[0], 10).toLocaleString('zh-CN')
-  let decimalPart = parts[1] || ''
-  
-  while (decimalPart.length < 6) {
-    decimalPart += '0'
-  }
-  
-  return `${integerPart}.${decimalPart}`
 }
 
 const columns = computed((): Column[] => {

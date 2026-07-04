@@ -178,7 +178,7 @@
                   "
                 >
                   <span v-if="row.daily_limit_usd"
-                    >{{ currencyStore.formatAmount(row.daily_limit_usd) }}/{{
+                    >${{ row.daily_limit_usd }}/{{
                       t("admin.groups.limitDay")
                     }}</span
                   >
@@ -191,7 +191,7 @@
                     >·</span
                   >
                   <span v-if="row.weekly_limit_usd"
-                    >{{ currencyStore.formatAmount(row.weekly_limit_usd) }}/{{
+                    >${{ row.weekly_limit_usd }}/{{
                       t("admin.groups.limitWeek")
                     }}</span
                   >
@@ -201,7 +201,7 @@
                     >·</span
                   >
                   <span v-if="row.monthly_limit_usd"
-                    >{{ currencyStore.formatAmount(row.monthly_limit_usd) }}/{{
+                    >${{ row.monthly_limit_usd }}/{{
                       t("admin.groups.limitMonth")
                     }}</span
                   >
@@ -292,8 +292,8 @@
                   t("admin.groups.usageToday")
                 }}</span>
                 <span class="ml-1 font-medium text-gray-700 dark:text-gray-300"
-                  >{{
-                    currencyStore.formatAmount(usageMap.get(row.id)?.today_cost ?? 0)
+                  >${{
+                    formatCost(usageMap.get(row.id)?.today_cost ?? 0)
                   }}</span
                 >
               </div>
@@ -302,8 +302,8 @@
                   t("admin.groups.usageTotal")
                 }}</span>
                 <span class="ml-1 font-medium text-gray-700 dark:text-gray-300"
-                  >{{
-                    currencyStore.formatAmount(usageMap.get(row.id)?.total_cost ?? 0)
+                  >${{
+                    formatCost(usageMap.get(row.id)?.total_cost ?? 0)
                   }}</span
                 >
               </div>
@@ -3179,7 +3179,6 @@ import { ref, reactive, computed, onMounted, onUnmounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useAppStore } from "@/stores/app";
 import { useOnboardingStore } from "@/stores/onboarding";
-import { useCurrencyStore } from "@/stores";
 import { adminAPI } from "@/api/admin";
 import type { AdminGroup, GroupPlatform, SubscriptionType } from "@/types";
 import type { Column } from "@/components/common/types";
@@ -3220,7 +3219,6 @@ import { normalizeSupportedModelScopesForPlatform } from "./groupsSupportedModel
 
 const { t } = useI18n();
 const appStore = useAppStore();
-const currencyStore = useCurrencyStore();
 const onboardingStore = useOnboardingStore();
 
 const ALWAYS_VISIBLE_COLUMNS = new Set(["name", "actions"]);
@@ -3958,7 +3956,7 @@ const formatImagePricePreview = (value: number | string | null | undefined) => {
   if (!Number.isFinite(price) || price < 0) {
     return t("admin.groups.imagePricing.notConfigured");
   }
-  return currencyStore.formatAmount(price);
+  return `$${price.toFixed(6).replace(/0+$/, "").replace(/\.$/, "")}`;
 };
 
 const buildImageFinalPricePreview = (form: ImagePricingFormState) => {
@@ -4047,6 +4045,12 @@ const loadGroups = async () => {
       loading.value = false;
     }
   }
+};
+
+const formatCost = (cost: number): string => {
+  if (cost >= 1000) return cost.toFixed(0);
+  if (cost >= 100) return cost.toFixed(1);
+  return cost.toFixed(2);
 };
 
 const loadUsageSummary = async () => {

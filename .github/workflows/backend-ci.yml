@@ -7,15 +7,9 @@ on:
 permissions:
   contents: read
 
-env:
-  GOPROXY: https://goproxy.cn,direct
-  GOSUMDB: sum.golang.google.cn
-  PNPM_CONFIG_REGISTRY: https://registry.npmmirror.com
-
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
@@ -36,7 +30,6 @@ jobs:
 
   frontend:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
       - name: Setup pnpm
@@ -51,13 +44,12 @@ jobs:
           cache-dependency-path: frontend/pnpm-lock.yaml
       - name: Install frontend dependencies
         working-directory: frontend
-        run: pnpm install --frozen-lockfile --retry 3
+        run: pnpm install --frozen-lockfile
       - name: Frontend typecheck and critical vitest
         run: make test-frontend
 
   golangci-lint:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6

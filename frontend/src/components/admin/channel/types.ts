@@ -17,7 +17,6 @@ export interface IntervalFormEntry {
 export interface PricingFormEntry {
   models: string[]
   billing_mode: BillingMode
-  currency: string
   input_price: number | string | null
   output_price: number | string | null
   cache_write_price: number | string | null

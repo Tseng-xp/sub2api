@@ -496,9 +496,8 @@ func ProvideOpsService(
 }
 
 // ProvideSettingService wires SettingService with group reader and proxy repo.
-func ProvideSettingService(settingRepo SettingRepository, groupRepo GroupRepository, proxyRepo ProxyRepository, cfg *config.Config, buildInfo BuildInfo) *SettingService {
+func ProvideSettingService(settingRepo SettingRepository, groupRepo GroupRepository, proxyRepo ProxyRepository, cfg *config.Config) *SettingService {
 	svc := NewSettingService(settingRepo, cfg)
-	svc.SetVersion(buildInfo.Version)
 	svc.SetDefaultSubscriptionGroupReader(groupRepo)
 	svc.SetProxyRepository(proxyRepo)
 	if err := svc.LoadAPIKeyACLTrustForwardedIPSetting(context.Background()); err != nil {
@@ -511,13 +510,6 @@ func ProvideSettingService(settingRepo SettingRepository, groupRepo GroupReposit
 		logger.LegacyPrintf("service.setting", "Warning: migrate codex body fingerprint to signals failed: %v", err)
 	}
 	antigravity.SetUserAgentVersionResolver(svc.GetAntigravityUserAgentVersion)
-	return svc
-}
-
-// ProvideBillingService wires BillingService with SettingService for currency conversion.
-func ProvideBillingService(cfg *config.Config, pricingService *PricingService, settingService *SettingService) *BillingService {
-	svc := NewBillingService(cfg, pricingService)
-	svc.SetSettingService(settingService)
 	return svc
 }
 
@@ -566,7 +558,7 @@ var ProviderSet = wire.NewSet(
 	NewUsageService,
 	NewDashboardService,
 	ProvidePricingService,
-	ProvideBillingService,
+	NewBillingService,
 	ProvideBillingCacheService,
 	NewAnnouncementService,
 	NewAdminService,
