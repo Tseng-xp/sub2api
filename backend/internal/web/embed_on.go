@@ -131,7 +131,16 @@ func (s *FrontendServer) tryServeOverride(c *gin.Context, cleanPath string) bool
 	}
 	filePath := filepath.Join(s.overrideDir, filepath.Clean("/"+cleanPath))
 	info, err := os.Stat(filePath)
-	if err != nil || info.IsDir() {
+	if err != nil {
+		return false
+	}
+	if info.IsDir() {
+		indexPath := filepath.Join(filePath, "index.html")
+		if _, err := os.Stat(indexPath); err == nil {
+			c.File(indexPath)
+			c.Abort()
+			return true
+		}
 		return false
 	}
 	c.File(filePath)
@@ -289,7 +298,16 @@ func tryServeOverrideFile(c *gin.Context, overrideDir, cleanPath string) bool {
 	}
 	filePath := filepath.Join(overrideDir, filepath.Clean("/"+cleanPath))
 	info, err := os.Stat(filePath)
-	if err != nil || info.IsDir() {
+	if err != nil {
+		return false
+	}
+	if info.IsDir() {
+		indexPath := filepath.Join(filePath, "index.html")
+		if _, err := os.Stat(indexPath); err == nil {
+			c.File(indexPath)
+			c.Abort()
+			return true
+		}
 		return false
 	}
 	c.File(filePath)
