@@ -126,26 +126,30 @@ func (s *FrontendServer) fileExists(path string) bool {
 // tryServeOverride checks if a local override file exists and serves it.
 // Files in overrideDir take precedence over embedded files.
 func (s *FrontendServer) tryServeOverride(c *gin.Context, cleanPath string) bool {
-	if s.overrideDir == "" {
-		return false
-	}
-	filePath := filepath.Join(s.overrideDir, cleanPath)
-	info, err := os.Stat(filePath)
-	if err != nil {
-		return false
-	}
-	if info.IsDir() {
-		indexPath := filepath.Join(filePath, "index.html")
-		if _, err := os.Stat(indexPath); err == nil {
-			c.File(indexPath)
-			c.Abort()
-			return true
+	dirs := []string{s.overrideDir, filepath.Join("resources", "docs")}
+	for _, dir := range dirs {
+		if dir == "" {
+			continue
 		}
-		return false
+		filePath := filepath.Join(dir, cleanPath)
+		info, err := os.Stat(filePath)
+		if err != nil {
+			continue
+		}
+		if info.IsDir() {
+			indexPath := filepath.Join(filePath, "index.html")
+			if _, err := os.Stat(indexPath); err == nil {
+				c.File(indexPath)
+				c.Abort()
+				return true
+			}
+			continue
+		}
+		c.File(filePath)
+		c.Abort()
+		return true
 	}
-	c.File(filePath)
-	c.Abort()
-	return true
+	return false
 }
 
 func (s *FrontendServer) serveIndexHTML(c *gin.Context) {
@@ -293,26 +297,30 @@ func ServeEmbeddedFrontend() gin.HandlerFunc {
 
 // tryServeOverrideFile is a standalone version of tryServeOverride for legacy usage.
 func tryServeOverrideFile(c *gin.Context, overrideDir, cleanPath string) bool {
-	if overrideDir == "" {
-		return false
-	}
-	filePath := filepath.Join(overrideDir, cleanPath)
-	info, err := os.Stat(filePath)
-	if err != nil {
-		return false
-	}
-	if info.IsDir() {
-		indexPath := filepath.Join(filePath, "index.html")
-		if _, err := os.Stat(indexPath); err == nil {
-			c.File(indexPath)
-			c.Abort()
-			return true
+	dirs := []string{overrideDir, filepath.Join("resources", "docs")}
+	for _, dir := range dirs {
+		if dir == "" {
+			continue
 		}
-		return false
+		filePath := filepath.Join(dir, cleanPath)
+		info, err := os.Stat(filePath)
+		if err != nil {
+			continue
+		}
+		if info.IsDir() {
+			indexPath := filepath.Join(filePath, "index.html")
+			if _, err := os.Stat(indexPath); err == nil {
+				c.File(indexPath)
+				c.Abort()
+				return true
+			}
+			continue
+		}
+		c.File(filePath)
+		c.Abort()
+		return true
 	}
-	c.File(filePath)
-	c.Abort()
-	return true
+	return false
 }
 
 func shouldBypassEmbeddedFrontend(path string) bool {
