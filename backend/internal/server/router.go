@@ -68,10 +68,10 @@ func SetupRouter(
 		c.Header("Pragma", "no-cache")
 		c.Header("Expires", "0")
 		filepath := c.Param("filepath")
-		if filepath == "" {
+		if filepath == "" || filepath == "/" {
 			filepath = "index.html"
 		}
-		c.FileFromFS(filepath, gin.Dir("resources/docs", false))
+		c.File("resources/docs/" + filepath)
 	})
 
 	// Serve embedded frontend with settings injection if available
