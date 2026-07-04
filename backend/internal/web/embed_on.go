@@ -129,7 +129,7 @@ func (s *FrontendServer) tryServeOverride(c *gin.Context, cleanPath string) bool
 	if s.overrideDir == "" {
 		return false
 	}
-	filePath := filepath.Join(s.overrideDir, filepath.Clean("/"+cleanPath))
+	filePath := filepath.Join(s.overrideDir, cleanPath)
 	info, err := os.Stat(filePath)
 	if err != nil {
 		return false
@@ -296,7 +296,7 @@ func tryServeOverrideFile(c *gin.Context, overrideDir, cleanPath string) bool {
 	if overrideDir == "" {
 		return false
 	}
-	filePath := filepath.Join(overrideDir, filepath.Clean("/"+cleanPath))
+	filePath := filepath.Join(overrideDir, cleanPath)
 	info, err := os.Stat(filePath)
 	if err != nil {
 		return false
