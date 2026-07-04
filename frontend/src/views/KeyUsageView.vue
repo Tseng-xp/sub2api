@@ -12,8 +12,8 @@
         <div class="flex items-center gap-3">
           <LocaleSwitcher />
           <a
-            v-if="docUrl"
-            :href="docUrl"
+            v-if="localizedDocUrl"
+            :href="localizedDocUrl"
             target="_blank"
             rel="noopener noreferrer"
             class="rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-dark-400 dark:hover:bg-dark-800 dark:hover:text-white"
@@ -398,8 +398,8 @@
         </p>
         <div class="flex items-center gap-4">
           <a
-            v-if="docUrl"
-            :href="docUrl"
+            v-if="localizedDocUrl"
+            :href="localizedDocUrl"
             target="_blank"
             rel="noopener noreferrer"
             class="text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-dark-400 dark:hover:text-white"
@@ -419,6 +419,7 @@
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores'
+import { getLocale } from '@/i18n'
 import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { useCurrencyStore } from '@/stores'
@@ -433,6 +434,15 @@ const currencyStore = useCurrencyStore()
 const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || 'Sub2API')
 const siteLogo = computed(() => appStore.cachedPublicSettings?.site_logo || appStore.siteLogo || '')
 const docUrl = computed(() => appStore.cachedPublicSettings?.doc_url || appStore.docUrl || '')
+const localizedDocUrl = computed(() => {
+  const url = docUrl.value
+  if (!url) return ''
+  const locale = getLocale()
+  if (locale === 'zh') {
+    return url.replace(/\/docs\/(zh\/)?/, '/docs/zh/')
+  }
+  return url.replace(/\/docs\/zh\//, '/docs/')
+})
 
 // ==================== Theme (same as HomeView) ====================
 
