@@ -128,5 +128,5 @@ func serveDocsWithCacheControl(c *gin.Context) {
 	if filepath == "" || filepath == "/" {
 		filepath = "index.html"
 	}
-	c.File("resources/docs/" + filepath)
+	c.File("/app/resources/docs/" + filepath)
 }
