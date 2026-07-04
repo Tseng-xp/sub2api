@@ -34,6 +34,7 @@ backend/.gocache/
 node_modules/
 frontend/node_modules/
 frontend/dist/
+frontend/package-lock.json
 *.local
 *.tsbuildinfo
 vite.config.d.ts
@@ -145,6 +146,8 @@ aicodex
 output/
 # 临时部署脚本
 deploy.sh
+deploy_latest.sh
+deploy_*.sh
 deploy_to_server.py
 backend/main_linux
 # 根目录临时脚本

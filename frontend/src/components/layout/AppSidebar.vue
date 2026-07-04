@@ -8,7 +8,7 @@
   >
     <!-- Logo/Brand -->
     <router-link
-      :to="authStore.isAuthenticated ? (isAdmin ? '/admin/dashboard' : '/dashboard') : '/login'"
+      to="/home"
       class="sidebar-header flex items-center gap-3"
       :class="{ 'sidebar-header-collapsed': sidebarCollapsed }"
       active-class=""
