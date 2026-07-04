@@ -225,7 +225,13 @@ const dropdownRef = ref<HTMLElement | null>(null)
 const contactInfo = computed(() => appStore.contactInfo)
 const docUrl = computed(() => appStore.docUrl)
 const localizedDocUrl = computed(() => {
-  return docUrl.value || ''
+  const url = docUrl.value
+  if (!url) return ''
+  const locale = getLocale()
+  if (locale === 'zh') {
+    return url.replace(/\/docs\/(zh\/)?/, '/docs/zh/')
+  }
+  return url.replace(/\/docs\/zh\//, '/docs/')
 })
 const avatarUrl = computed(() => user.value?.avatar_url?.trim() || '')
 
