@@ -67,7 +67,11 @@ func SetupRouter(
 		c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
 		c.Header("Pragma", "no-cache")
 		c.Header("Expires", "0")
-		c.FileFromFS(c.Request.URL.Path, gin.Dir("resources/docs", false))
+		filepath := c.Param("filepath")
+		if filepath == "" {
+			filepath = "index.html"
+		}
+		c.FileFromFS(filepath, gin.Dir("resources/docs", false))
 	})
 
 	// Serve embedded frontend with settings injection if available
