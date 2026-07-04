@@ -115,14 +115,3 @@ func registerRoutes(
 
 	handler.RegisterPageRoutes(v1, cfg.Pricing.DataDir, gin.HandlerFunc(jwtAuth), gin.HandlerFunc(adminAuth), settingService)
 }
-
-func serveDocsWithCacheControl(c *gin.Context) {
-	c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
-	c.Header("Pragma", "no-cache")
-	c.Header("Expires", "0")
-	filepath := c.Param("filepath")
-	if filepath == "" || filepath == "/" {
-		filepath = "index.html"
-	}
-	c.File("/app/resources/docs/" + filepath)
-}

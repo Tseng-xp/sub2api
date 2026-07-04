@@ -76,17 +76,19 @@ export const useCurrencyStore = defineStore('currency', () => {
 
   async function initFromSettings() {
     try {
-      const settings = await getSettings()
-      if (settings.default_display_currency) {
-        displayCurrency.value = settings.default_display_currency
+      const settings = await getSettings() as unknown as Record<string, unknown>
+      const displayCurrencyValue = settings.default_display_currency as DisplayCurrency | undefined
+      const exchangeRateValue = settings.default_exchange_rate as number | undefined
+      if (displayCurrencyValue) {
+        displayCurrency.value = displayCurrencyValue
         try {
-          localStorage.setItem(STORAGE_KEY, settings.default_display_currency)
+          localStorage.setItem(STORAGE_KEY, displayCurrencyValue)
         } catch (e) {
           // ignore
         }
       }
-      if (settings.default_exchange_rate && settings.default_exchange_rate > 0) {
-        exchangeRate.value = settings.default_exchange_rate
+      if (exchangeRateValue && exchangeRateValue > 0) {
+        exchangeRate.value = exchangeRateValue
       }
       initialized.value = true
     } catch (e) {
@@ -95,16 +97,19 @@ export const useCurrencyStore = defineStore('currency', () => {
   }
 
   function initFromInjectedConfig(config: PublicSettings) {
-    if (config.default_display_currency) {
-      displayCurrency.value = config.default_display_currency as DisplayCurrency
+    const configRecord = config as unknown as Record<string, unknown>
+    const displayCurrencyValue = configRecord.default_display_currency as DisplayCurrency | undefined
+    const exchangeRateValue = configRecord.default_exchange_rate as number | undefined
+    if (displayCurrencyValue) {
+      displayCurrency.value = displayCurrencyValue
       try {
-        localStorage.setItem(STORAGE_KEY, config.default_display_currency)
+        localStorage.setItem(STORAGE_KEY, displayCurrencyValue)
       } catch (e) {
         // ignore
       }
     }
-    if (config.default_exchange_rate && config.default_exchange_rate > 0) {
-      exchangeRate.value = config.default_exchange_rate
+    if (exchangeRateValue && exchangeRateValue > 0) {
+      exchangeRate.value = exchangeRateValue
     }
     initialized.value = true
   }

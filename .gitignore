@@ -140,3 +140,15 @@ docs/*
 frontend/coverage/
 aicodex
 output/
+
+# ===================
+# 临时脚本和二进制
+# ===================
+/sub2api
+check_*.py
+test_*.py
+test_glm*.py
+deploy_custom.py
+deploy_latest.py
+test_latest_pull.py
+test_ghcr_pull.py

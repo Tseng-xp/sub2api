@@ -405,8 +405,7 @@ func createAdminUser(cfg *SetupConfig) (bool, string, error) {
 			return false, "", fmt.Errorf("failed to generate admin password: %w", genErr)
 		}
 		cfg.Admin.Password = password
-		fmt.Printf("Generated admin password (one-time): %s\n", cfg.Admin.Password)
-		fmt.Println("IMPORTANT: Save this password! It will not be shown again.")
+		logger.LegacyPrintf("setup", "%s", "Generated admin password (not shown for security). Password is returned as function result.")
 	}
 
 	admin := &service.User{
