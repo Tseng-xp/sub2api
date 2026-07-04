@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>通元聚合 API 文档</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --primary: #6366f1;
+            --bg-dark: #0f172a;
+            --bg-card: #1e293b;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --border: #334155;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg-dark); color: var(--text-primary); line-height: 1.6; padding: 2rem; max-width: 900px; margin: 0 auto; }
+        header { margin-bottom: 3rem; }
+        h1 { font-size: 2rem; color: var(--primary); margin-bottom: 0.5rem; }
+        h2 { font-size: 1.5rem; margin-top: 2rem; margin-bottom: 1rem; color: var(--text-primary); }
+        h3 { font-size: 1.2rem; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+        p { margin-bottom: 1rem; color: var(--text-secondary); }
+        code { background: #0f172a; padding: 0.2rem 0.4rem; border-radius: 4px; font-family: 'Fira Code', monospace; }
+        pre { background: #0f172a; padding: 1rem; border-radius: 8px; overflow-x: auto; margin-bottom: 1rem; }
+        .card { background: var(--bg-card); padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem; border: 1px solid var(--border); }
+        .endpoint { color: #22c55e; font-weight: bold; }
+        .method { color: #f59e0b; }
+        footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border); color: var(--text-secondary); font-size: 0.9rem; }
+        footer a { color: var(--primary); text-decoration: none; }
+        footer a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>通元聚合 API</h1>
+        <p>多 AI 模型统一调用接口</p>
+    </header>
+
+    <section class="card">
+        <h2>快速开始</h2>
+        <p>通过统一接口调用多种 AI 模型。</p>
+        <pre><code>curl -X POST https://tongyuan-ai.cn/api/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -d '{
+    "model": "gpt-3.5-turbo",
+    "messages": [{"role": "user", "content": "你好"}]
+  }'</code></pre>
+    </section>
+
+    <section class="card">
+        <h2>API 接口</h2>
+        
+        <h3><span class="method">POST</span> <span class="endpoint">/api/v1/chat/completions</span></h3>
+        <p>创建聊天补全。</p>
+        
+        <h3><span class="method">POST</span> <span class="endpoint">/api/v1/completions</span></h3>
+        <p>创建文本补全。</p>
+        
+        <h3><span class="method">GET</span> <span class="endpoint">/api/v1/models</span></h3>
+        <p>列出所有可用模型。</p>
+    </section>
+
+    <section class="card">
+        <h2>支持的模型</h2>
+        <p>我们支持多种模型，包括 GPT 系列、Claude、GLM 等。</p>
+    </section>
+
+    <section class="card">
+        <h2>常见问题</h2>
+        <h3>如何获取 API Key？</h3>
+        <p>注册账号后，在账号设置中创建 API Key。</p>
+        
+        <h3>如何联系支持？</h3>
+        <p>邮箱：<a href="mailto:lhwsgpu@163.com">lhwsgpu@163.com</a></p>
+    </section>
+
+    <footer>
+        <p>&copy; 2026 通元聚合. 保留所有权利。</p>
+    </footer>
+</body>
+</html>

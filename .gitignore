@@ -137,6 +137,9 @@ docs/*
 !docs/PAYMENT.md
 !docs/PAYMENT_CN.md
 !docs/ADMIN_PAYMENT_INTEGRATION_API.md
+!docs/index.html
+!docs/zh/
+!docs/zh/*
 !docs/legal/
 !docs/legal/*.md
 .serena/
