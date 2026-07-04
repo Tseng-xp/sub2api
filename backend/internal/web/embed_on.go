@@ -126,7 +126,7 @@ func (s *FrontendServer) fileExists(path string) bool {
 // tryServeOverride checks if a local override file exists and serves it.
 // Files in overrideDir take precedence over embedded files.
 func (s *FrontendServer) tryServeOverride(c *gin.Context, cleanPath string) bool {
-	dirs := []string{s.overrideDir, filepath.Join("resources", "docs")}
+	dirs := []string{s.overrideDir, "resources"}
 	for _, dir := range dirs {
 		if dir == "" {
 			continue
@@ -297,7 +297,7 @@ func ServeEmbeddedFrontend() gin.HandlerFunc {
 
 // tryServeOverrideFile is a standalone version of tryServeOverride for legacy usage.
 func tryServeOverrideFile(c *gin.Context, overrideDir, cleanPath string) bool {
-	dirs := []string{overrideDir, filepath.Join("resources", "docs")}
+	dirs := []string{overrideDir, "resources"}
 	for _, dir := range dirs {
 		if dir == "" {
 			continue
