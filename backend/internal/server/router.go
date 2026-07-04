@@ -62,17 +62,8 @@ func SetupRouter(
 	}))
 
 	// Serve docs from resources directory (must be before frontend middleware)
-	// Add cache control headers to prevent browser caching of static docs
-	r.GET("/docs/*filepath", func(c *gin.Context) {
-		c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
-		c.Header("Pragma", "no-cache")
-		c.Header("Expires", "0")
-		filepath := c.Param("filepath")
-		if filepath == "" || filepath == "/" {
-			filepath = "index.html"
-		}
-		c.File("resources/docs/" + filepath)
-	})
+	r.GET("/docs/*filepath", serveDocsWithCacheControl)
+	r.HEAD("/docs/*filepath", serveDocsWithCacheControl)
 
 	// Serve embedded frontend with settings injection if available
 	if web.HasEmbeddedFrontend() {
@@ -127,4 +118,15 @@ func registerRoutes(
 	routes.RegisterPaymentRoutes(v1, h.Payment, h.PaymentWebhook, h.Admin.Payment, jwtAuth, adminAuth, settingService)
 
 	handler.RegisterPageRoutes(v1, cfg.Pricing.DataDir, gin.HandlerFunc(jwtAuth), gin.HandlerFunc(adminAuth), settingService)
+}
+
+func serveDocsWithCacheControl(c *gin.Context) {
+	c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
+	c.Header("Pragma", "no-cache")
+	c.Header("Expires", "0")
+	filepath := c.Param("filepath")
+	if filepath == "" || filepath == "/" {
+		filepath = "index.html"
+	}
+	c.File("resources/docs/" + filepath)
 }
