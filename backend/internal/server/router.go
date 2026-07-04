@@ -61,6 +61,9 @@ func SetupRouter(
 		return nil
 	}))
 
+	// Serve docs from resources directory (must be before frontend middleware)
+	r.StaticFS("/docs", gin.Dir("resources/docs", false))
+
 	// Serve embedded frontend with settings injection if available
 	if web.HasEmbeddedFrontend() {
 		frontendServer, err := web.NewFrontendServer(settingService)
@@ -79,9 +82,6 @@ func SetupRouter(
 	} else {
 		settingService.SetOnUpdateCallback(refreshFrameOrigins)
 	}
-
-	// Serve docs from resources directory
-	r.StaticFS("/docs", gin.Dir("resources/docs", false))
 
 	// 注册路由
 	registerRoutes(r, handlers, jwtAuth, adminAuth, apiKeyAuth, apiKeyService, subscriptionService, opsService, settingService, cfg, redisClient)
