@@ -12,3 +12,7 @@ dist/
 # 忽略缓存
 .cache/
 .vite/
+
+# 忽略临时构建脚本
+build_check.js
+build_error.log
