@@ -28,8 +28,8 @@
 
         <!-- Docs Link -->
         <a
-          v-if="docUrl"
-          :href="docUrl"
+          v-if="localizedDocUrl"
+          :href="localizedDocUrl"
           target="_blank"
           rel="noopener noreferrer"
           class="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-dark-400 dark:hover:bg-dark-800 dark:hover:text-white"
@@ -37,6 +37,9 @@
           <Icon name="book" size="sm" />
           <span class="hidden sm:inline">{{ t('nav.docs') }}</span>
         </a>
+
+        <!-- Currency Switcher -->
+        <CurrencySwitcher />
 
         <!-- Language Switcher -->
         <LocaleSwitcher />
@@ -63,7 +66,7 @@
             />
           </svg>
           <span class="text-sm font-semibold text-primary-700 dark:text-primary-300">
-            ${{ user.balance?.toFixed(2) || '0.00' }}
+            {{ currencyStore.formatAmount(user.balance) }}
           </span>
         </div>
 
@@ -111,7 +114,7 @@
                   {{ t('common.balance') }}
                 </div>
                 <div class="text-sm font-semibold text-primary-600 dark:text-primary-400">
-                  ${{ user.balance?.toFixed(2) || '0.00' }}
+                  {{ currencyStore.formatAmount(user.balance) }}
                 </div>
               </div>
 
@@ -217,11 +220,14 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAppStore, useAuthStore, useOnboardingStore } from '@/stores'
+import { useCurrencyStore } from '@/stores/currency'
 import { useAdminSettingsStore } from '@/stores/adminSettings'
 import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
+import CurrencySwitcher from '@/components/common/CurrencySwitcher.vue'
 import SubscriptionProgressMini from '@/components/common/SubscriptionProgressMini.vue'
 import AnnouncementBell from '@/components/common/AnnouncementBell.vue'
 import Icon from '@/components/icons/Icon.vue'
+import { getLocale } from '@/i18n'
 
 const router = useRouter()
 const route = useRoute()
@@ -230,6 +236,7 @@ const appStore = useAppStore()
 const authStore = useAuthStore()
 const adminSettingsStore = useAdminSettingsStore()
 const onboardingStore = useOnboardingStore()
+const currencyStore = useCurrencyStore()
 
 const user = computed(() => authStore.user)
 const dropdownOpen = ref(false)
@@ -237,6 +244,16 @@ const dropdownRef = ref<HTMLElement | null>(null)
 const contactInfo = computed(() => appStore.contactInfo)
 const docUrl = computed(() => appStore.docUrl)
 const avatarUrl = computed(() => user.value?.avatar_url?.trim() || '')
+
+const localizedDocUrl = computed(() => {
+  const url = docUrl.value
+  if (!url) return ''
+  const locale = getLocale()
+  if (locale === 'zh') {
+    return url.replace(/\/docs\/(zh\/)?/, '/docs/zh/')
+  }
+  return url.replace(/\/docs\/zh\//, '/docs/')
+})
 
 // 只在标准模式的管理员下显示新手引导按钮
 const showOnboardingButton = computed(() => {

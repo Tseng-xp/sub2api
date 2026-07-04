@@ -40,11 +40,11 @@
     <header class="relative z-20 px-6 py-4">
       <nav class="mx-auto flex max-w-6xl items-center justify-between">
         <!-- Logo -->
-        <div class="flex items-center">
+        <router-link to="/home" class="flex items-center">
           <div class="h-10 w-10 overflow-hidden rounded-xl shadow-md">
             <img :src="siteLogo || '/logo.png'" alt="Logo" class="h-full w-full object-contain" />
           </div>
-        </div>
+        </router-link>
 
         <!-- Nav Actions -->
         <div class="flex items-center gap-3">
@@ -53,8 +53,8 @@
 
           <!-- Doc Link -->
           <a
-            v-if="docUrl"
-            :href="docUrl"
+            v-if="localizedDocUrl"
+            :href="localizedDocUrl"
             target="_blank"
             rel="noopener noreferrer"
             class="rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-dark-400 dark:hover:bg-dark-800 dark:hover:text-white"
@@ -382,21 +382,18 @@
         </p>
         <div class="flex items-center gap-4">
           <a
-            v-if="docUrl"
-            :href="docUrl"
+            v-if="localizedDocUrl"
+            :href="localizedDocUrl"
             target="_blank"
             rel="noopener noreferrer"
             class="text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-dark-400 dark:hover:text-white"
           >
             {{ t('home.docs') }}
           </a>
-          <a
-            :href="githubUrl"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-dark-400 dark:hover:text-white"
-          >
-            GitHub
+        </div>
+        <div class="mt-4 text-center text-xs text-gray-400 dark:text-dark-500">
+          <a href="https://beian.miit.gov.cn" target="_blank" rel="noopener noreferrer" class="hover:text-gray-600 dark:hover:text-dark-300 transition-colors">
+            粤ICP备2025408634号-4
           </a>
         </div>
       </div>
@@ -410,6 +407,7 @@ import { useI18n } from 'vue-i18n'
 import { useAuthStore, useAppStore } from '@/stores'
 import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
 import Icon from '@/components/icons/Icon.vue'
+import { getLocale } from '@/i18n'
 
 const { t } = useI18n()
 
@@ -423,6 +421,16 @@ const siteSubtitle = computed(() => appStore.cachedPublicSettings?.site_subtitle
 const docUrl = computed(() => appStore.cachedPublicSettings?.doc_url || appStore.docUrl || '')
 const homeContent = computed(() => appStore.cachedPublicSettings?.home_content || '')
 
+const localizedDocUrl = computed(() => {
+  const url = docUrl.value
+  if (!url) return ''
+  const locale = getLocale()
+  if (locale === 'zh') {
+    return url.replace(/\/docs\/(zh\/)?/, '/docs/zh/')
+  }
+  return url.replace(/\/docs\/zh\//, '/docs/')
+})
+
 // Check if homeContent is a URL (for iframe display)
 const isHomeContentUrl = computed(() => {
   const content = homeContent.value.trim()
@@ -431,9 +439,6 @@ const isHomeContentUrl = computed(() => {
 
 // Theme
 const isDark = ref(document.documentElement.classList.contains('dark'))
-
-// GitHub URL
-const githubUrl = 'https://github.com/Wei-Shaw/sub2api'
 
 // Auth state
 const isAuthenticated = computed(() => authStore.isAuthenticated)

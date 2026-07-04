@@ -12,8 +12,8 @@
         <div class="flex items-center gap-3">
           <LocaleSwitcher />
           <a
-            v-if="docUrl"
-            :href="docUrl"
+            v-if="localizedDocUrl"
+            :href="localizedDocUrl"
             target="_blank"
             rel="noopener noreferrer"
             class="rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-dark-400 dark:hover:bg-dark-800 dark:hover:text-white"
@@ -398,18 +398,17 @@
         </p>
         <div class="flex items-center gap-4">
           <a
-            v-if="docUrl"
-            :href="docUrl"
+            v-if="localizedDocUrl"
+            :href="localizedDocUrl"
             target="_blank"
             rel="noopener noreferrer"
             class="text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-dark-400 dark:hover:text-white"
           >{{ t('home.docs') }}</a>
-          <a
-            :href="githubUrl"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-dark-400 dark:hover:text-white"
-          >GitHub</a>
+        </div>
+        <div class="mt-4 text-center text-xs text-gray-400 dark:text-dark-500">
+          <a href="https://beian.miit.gov.cn" target="_blank" rel="noopener noreferrer" class="hover:text-gray-600 dark:hover:text-dark-300 transition-colors">
+            粤ICP备2025408634号-4
+          </a>
         </div>
       </div>
     </footer>
@@ -420,19 +419,31 @@
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores'
+import { useCurrencyStore } from '@/stores/currency'
 import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { buildGatewayUrl } from '@/api/client'
+import { getLocale } from '@/i18n'
 
 const { t, locale } = useI18n()
 const appStore = useAppStore()
+const currencyStore = useCurrencyStore()
 
 // ==================== Site Settings (same as HomeView) ====================
 
 const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || 'Sub2API')
 const siteLogo = computed(() => appStore.cachedPublicSettings?.site_logo || appStore.siteLogo || '')
 const docUrl = computed(() => appStore.cachedPublicSettings?.doc_url || appStore.docUrl || '')
-const githubUrl = 'https://github.com/Wei-Shaw/sub2api'
+
+const localizedDocUrl = computed(() => {
+  const url = docUrl.value
+  if (!url) return ''
+  const locale = getLocale()
+  if (locale === 'zh') {
+    return url.replace(/\/docs\/(zh\/)?/, '/docs/zh/')
+  }
+  return url.replace(/\/docs\/zh\//, '/docs/')
+})
 
 // ==================== Theme (same as HomeView) ====================
 
@@ -830,7 +841,7 @@ const showDailyUsage = computed(() => Boolean(resultData.value && Array.isArray(
 
 function usd(value: number | null | undefined): string {
   if (value == null || value < 0) return '-'
-  return '$' + Number(value).toFixed(2)
+  return currencyStore.formatAmount(value)
 }
 
 function fmtNum(val: number | null | undefined): string {
