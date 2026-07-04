@@ -62,7 +62,13 @@ func SetupRouter(
 	}))
 
 	// Serve docs from resources directory (must be before frontend middleware)
-	r.StaticFS("/docs", gin.Dir("resources/docs", false))
+	// Add cache control headers to prevent browser caching of static docs
+	r.GET("/docs/*filepath", func(c *gin.Context) {
+		c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
+		c.Header("Pragma", "no-cache")
+		c.Header("Expires", "0")
+		c.FileFromFS(c.Request.URL.Path, gin.Dir("resources/docs", false))
+	})
 
 	// Serve embedded frontend with settings injection if available
 	if web.HasEmbeddedFrontend() {
