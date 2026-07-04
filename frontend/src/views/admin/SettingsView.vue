@@ -7583,13 +7583,13 @@ function defaultLoginAgreementDocuments(): LoginAgreementDocument[] {
       content_md: "",
     },
     {
-      id: "usage-policy",
-      title: localText("使用政策", "Usage Policy"),
+      id: "privacy-policy",
+      title: localText("隐私政策", "Privacy Policy"),
       content_md: "",
     },
     {
-      id: "supported-regions",
-      title: localText("支持的国家和地区", "Supported Countries and Regions"),
+      id: "usage-policy",
+      title: localText("使用政策", "Usage Policy"),
       content_md: "",
     },
     {
