@@ -76,7 +76,7 @@
 
           <template #cell-bonus_amount="{ value }">
             <span class="text-sm font-medium text-gray-900 dark:text-white">
-              {{ currencyStore.currencySymbol }}{{ value.toFixed(2) }}
+              {{ usd(value) }}
             </span>
           </template>
 
@@ -347,7 +347,7 @@
           </div>
           <div class="text-right">
             <span class="text-sm font-medium text-green-600 dark:text-green-400">
-              +{{ currencyStore.currencySymbol }}{{ usage.bonus_amount.toFixed(2) }}
+              +{{ usd(usage.bonus_amount) }}
             </span>
           </div>
         </div>
@@ -408,6 +408,10 @@ import Icon from '@/components/icons/Icon.vue'
 const { t } = useI18n()
 const currencyStore = useCurrencyStore()
 const appStore = useAppStore()
+
+function usd(value: number | null | undefined): string {
+  return currencyStore.formatAmount(value)
+}
 const { copyToClipboard: clipboardCopy } = useClipboard()
 
 // State

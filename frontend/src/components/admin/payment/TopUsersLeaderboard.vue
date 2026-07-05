@@ -27,7 +27,7 @@
           <span class="text-sm text-gray-700 dark:text-gray-300">{{ user.email }}</span>
         </div>
         <span class="text-sm font-medium text-gray-900 dark:text-white">
-          {{ currencyStore.currencySymbol }}{{ user.amount.toFixed(2) }}
+          {{ usd(user.amount) }}
         </span>
       </div>
     </div>
@@ -40,6 +40,10 @@ import { useCurrencyStore } from '@/stores/currency'
 
 const { t } = useI18n()
 const currencyStore = useCurrencyStore()
+
+function usd(value: number | null | undefined): string {
+  return currencyStore.formatAmount(value)
+}
 
 defineProps<{
   users: { user_id: number; email: string; amount: number }[]

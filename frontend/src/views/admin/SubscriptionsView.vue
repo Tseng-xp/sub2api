@@ -227,9 +227,9 @@
                     ></div>
                   </div>
                   <span class="usage-amount">
-                    {{ currencyStore.currencySymbol }}{{ row.daily_usage_usd?.toFixed(2) || '0.00' }}
+                    {{ usd(row.daily_usage_usd) }}
                     <span class="text-gray-400">/</span>
-                    {{ currencyStore.currencySymbol }}{{ row.group?.daily_limit_usd?.toFixed(2) }}
+                    {{ usd(row.group?.daily_limit_usd) }}
                   </span>
                 </div>
                 <div class="reset-info" v-if="row.daily_window_start">
@@ -264,9 +264,9 @@
                     ></div>
                   </div>
                   <span class="usage-amount">
-                    {{ currencyStore.currencySymbol }}{{ row.weekly_usage_usd?.toFixed(2) || '0.00' }}
+                    {{ usd(row.weekly_usage_usd) }}
                     <span class="text-gray-400">/</span>
-                    {{ currencyStore.currencySymbol }}{{ row.group?.weekly_limit_usd?.toFixed(2) }}
+                    {{ usd(row.group?.weekly_limit_usd) }}
                   </span>
                 </div>
                 <div class="reset-info" v-if="row.weekly_window_start">
@@ -301,9 +301,9 @@
                     ></div>
                   </div>
                   <span class="usage-amount">
-                    {{ currencyStore.currencySymbol }}{{ row.monthly_usage_usd?.toFixed(2) || '0.00' }}
+                    {{ usd(row.monthly_usage_usd) }}
                     <span class="text-gray-400">/</span>
-                    {{ currencyStore.currencySymbol }}{{ row.group?.monthly_limit_usd?.toFixed(2) }}
+                    {{ usd(row.group?.monthly_limit_usd) }}
                   </span>
                 </div>
                 <div class="reset-info" v-if="row.monthly_window_start">
@@ -1328,6 +1328,10 @@ const confirmResetQuota = async () => {
 }
 
 // Helper functions
+const usd = (value: number | null | undefined): string => {
+  return currencyStore.formatAmount(value)
+}
+
 const getDaysRemaining = (expiresAt: string): number | null => {
   const now = new Date()
   const expires = new Date(expiresAt)

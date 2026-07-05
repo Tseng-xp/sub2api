@@ -178,7 +178,7 @@
                   "
                 >
                   <span v-if="row.daily_limit_usd"
-                    >{{ currencyStore.currencySymbol }}{{ row.daily_limit_usd }}/{{
+                    >{{ usd(row.daily_limit_usd) }}/{{
                       t("admin.groups.limitDay")
                     }}</span
                   >
@@ -191,7 +191,7 @@
                     >·</span
                   >
                   <span v-if="row.weekly_limit_usd"
-                    >{{ currencyStore.currencySymbol }}{{ row.weekly_limit_usd }}/{{
+                    >{{ usd(row.weekly_limit_usd) }}/{{
                       t("admin.groups.limitWeek")
                     }}</span
                   >
@@ -201,7 +201,7 @@
                     >·</span
                   >
                   <span v-if="row.monthly_limit_usd"
-                    >{{ currencyStore.currencySymbol }}{{ row.monthly_limit_usd }}/{{
+                    >{{ usd(row.monthly_limit_usd) }}/{{
                       t("admin.groups.limitMonth")
                     }}</span
                   >
@@ -4053,6 +4053,10 @@ const formatCost = (cost: number): string => {
   if (cost >= 1000) return cost.toFixed(0);
   if (cost >= 100) return cost.toFixed(1);
   return cost.toFixed(2);
+};
+
+const usd = (value: number | null | undefined): string => {
+  return currencyStore.formatAmount(value)
 };
 
 const loadUsageSummary = async () => {

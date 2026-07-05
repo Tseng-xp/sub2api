@@ -65,16 +65,16 @@
       <div class="min-w-0 flex-1">
         <p class="text-xs font-medium text-gray-500">{{ t('usage.totalCost') }}</p>
         <p class="text-xl font-bold text-green-600">
-          {{ currencyStore.currencySymbol }}{{ (stats?.total_actual_cost || 0).toFixed(4) }}
+          {{ usd(stats?.total_actual_cost) }}
         </p>
         <p class="text-xs text-gray-400">
           <template v-if="showAccountCost && totalAccountCost != null">
-            <span class="text-orange-500">{{ t('usage.accountCost') }} {{ currencyStore.currencySymbol }}{{ totalAccountCost.toFixed(4) }}</span>
+            <span class="text-orange-500">{{ t('usage.accountCost') }} {{ usd(totalAccountCost) }}</span>
             <span> · </span>
           </template>
           <span>
             {{ t('usage.standardCost') }}
-            <span :class="{ 'line-through': strikeStandardCost }">{{ currencyStore.currencySymbol }}{{ (stats?.total_cost || 0).toFixed(4) }}</span>
+            <span :class="{ 'line-through': strikeStandardCost }">{{ usd(stats?.total_cost) }}</span>
           </span>
         </p>
       </div>
@@ -107,6 +107,10 @@ const props = withDefaults(defineProps<{
 
 const { t } = useI18n()
 const currencyStore = useCurrencyStore()
+
+function usd(value: number | null | undefined): string {
+  return currencyStore.formatAmount(value)
+}
 
 const totalAccountCost = computed(() => {
   const stats = props.stats as (AdminUsageStatsResponse & { total_account_cost?: number }) | null

@@ -8,7 +8,7 @@
         </div>
         <div>
           <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('payment.admin.todayRevenue') }}</p>
-          <p class="text-xl font-bold text-gray-900 dark:text-white">{{ currencyStore.currencySymbol }}{{ formatMoney(stats.today_amount) }}</p>
+          <p class="text-xl font-bold text-gray-900 dark:text-white">{{ usd(stats.today_amount) }}</p>
           <p class="text-xs text-gray-500 dark:text-gray-400">
             {{ stats.today_count }} {{ t('payment.admin.orders') }}
           </p>
@@ -24,7 +24,7 @@
         </div>
         <div>
           <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('payment.admin.totalRevenue') }}</p>
-          <p class="text-xl font-bold text-gray-900 dark:text-white">{{ currencyStore.currencySymbol }}{{ formatMoney(stats.total_amount) }}</p>
+          <p class="text-xl font-bold text-gray-900 dark:text-white">{{ usd(stats.total_amount) }}</p>
           <p class="text-xs text-gray-500 dark:text-gray-400">
             {{ stats.total_count }} {{ t('payment.admin.orders') }}
           </p>
@@ -53,7 +53,7 @@
         </div>
         <div>
           <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('payment.admin.avgAmount') }}</p>
-          <p class="text-xl font-bold text-gray-900 dark:text-white">{{ currencyStore.currencySymbol }}{{ formatMoney(stats.avg_amount) }}</p>
+          <p class="text-xl font-bold text-gray-900 dark:text-white">{{ usd(stats.avg_amount) }}</p>
         </div>
       </div>
     </div>
@@ -69,11 +69,12 @@ import type { DashboardStats } from '@/types/payment'
 const { t } = useI18n()
 const currencyStore = useCurrencyStore()
 
+function usd(value: number | null | undefined): string {
+  return currencyStore.formatAmount(value)
+}
+
 defineProps<{
   stats: DashboardStats
 }>()
 
-function formatMoney(value: number): string {
-  return value.toFixed(2)
-}
 </script>

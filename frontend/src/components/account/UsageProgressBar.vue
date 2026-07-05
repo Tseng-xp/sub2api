@@ -13,14 +13,14 @@
           {{ formatTokens }}
         </span>
         <span class="rounded bg-gray-100 px-1.5 py-0.5 dark:bg-gray-800" :title="t('usage.accountBilled')">
-          A {{ currencyStore.currencySymbol }}{{ formatAccountCost }}
+          A {{ usd(props.windowStats?.cost) }}
         </span>
         <span
           v-if="windowStats?.user_cost != null"
           class="rounded bg-gray-100 px-1.5 py-0.5 dark:bg-gray-800"
           :title="t('usage.userBilled')"
         >
-          U {{ currencyStore.currencySymbol }}{{ formatUserCost }}
+          U {{ usd(props.windowStats?.user_cost) }}
         </span>
       </div>
     </div>
@@ -74,6 +74,10 @@ const props = defineProps<{
 
 const { t } = useI18n()
 const currencyStore = useCurrencyStore()
+
+function usd(value: number | null | undefined): string {
+  return currencyStore.formatAmount(value)
+}
 
 // Reactive clock for countdown — only runs when a reset time is shown,
 // to avoid creating many idle timers across large account lists.

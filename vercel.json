@@ -1,0 +1,38 @@
+{
+  "name": "sub2api-frontend",
+  "version": 2,
+  "builds": [
+    {
+      "src": "frontend/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "../backend/internal/web/dist"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "https://tongyuan-ai.cn/api/$1"
+    },
+    {
+      "src": "/v1/(.*)",
+      "dest": "https://tongyuan-ai.cn/v1/$1"
+    },
+    {
+      "src": "/setup(.*)",
+      "dest": "https://tongyuan-ai.cn/setup$1"
+    },
+    {
+      "src": "/docs/(.*)",
+      "dest": "https://tongyuan-ai.cn/docs/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/$1"
+    }
+  ],
+  "env": {
+    "VITE_DEV_PROXY_TARGET": "https://tongyuan-ai.cn"
+  }
+}

@@ -573,8 +573,8 @@ describe('AccountUsageCell', () => {
 
 		expect(wrapper.text()).toContain('1.0M req')
 		expect(wrapper.text()).toContain('1.0B')
-		expect(wrapper.text()).toContain('A $12.35')
-		expect(wrapper.text()).toContain('U $6.79')
+		expect(wrapper.text()).toContain('A $12.345000')
+		expect(wrapper.text()).toContain('U $6.789000')
 
 		const badges = wrapper.findAll('span[title]')
 		expect(badges.some(node => node.attributes('title') === 'usage.accountBilled')).toBe(true)
