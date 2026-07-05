@@ -578,8 +578,9 @@ const allColumns = computed(() => [
   { key: 'group', label: t('admin.usage.group'), sortable: false },
   { key: 'stream', label: t('usage.type'), sortable: false },
   { key: 'billing_mode', label: t('admin.usage.billingMode'), sortable: false },
-  { key: 'tokens', label: t('usage.tokens'), sortable: false },
+  // 调整费用和Token列的显示顺序，费用列在前
   { key: 'cost', label: t('usage.cost'), sortable: false },
+  { key: 'tokens', label: t('usage.tokens'), sortable: false },
   { key: 'first_token', label: t('usage.firstToken'), sortable: false },
   { key: 'duration', label: t('usage.duration'), sortable: false },
   { key: 'created_at', label: t('usage.time'), sortable: true },
