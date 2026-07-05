@@ -35,7 +35,7 @@
         </template>
 
         <template #cell-balance="{ value }">
-          <span class="font-medium text-gray-900 dark:text-white">{{ currencyStore.currencySymbol }}{{ Number(value ?? 0).toFixed(2) }}</span>
+          <span class="font-medium text-gray-900 dark:text-white">{{ usd(value) }}</span>
         </template>
 
         <template #cell-eligible="{ value }">
@@ -88,6 +88,10 @@ import Icon from '@/components/icons/Icon.vue'
 const { t } = useI18n()
 const currencyStore = useCurrencyStore()
 const appStore = useAppStore()
+
+function usd(value: number | null | undefined): string {
+  return currencyStore.formatAmount(value)
+}
 
 const props = defineProps<{
   show: boolean
