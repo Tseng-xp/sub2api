@@ -97,6 +97,20 @@ vi.mock('@/stores', () => ({
   }),
 }))
 
+vi.mock('@/stores/currency', () => ({
+  useCurrencyStore: () => ({
+    displayCurrency: 'USD',
+    exchangeRate: 0,
+    currencySymbol: '$',
+    currencyCode: 'USD',
+    formatAmount: (amount: number | null | undefined) => {
+      if (amount == null || amount < 0) return '-'
+      return '$' + amount.toFixed(6)
+    },
+    convertAmount: (amount: number | null | undefined) => amount ?? 0,
+  }),
+}))
+
 describe('KeyUsageView daily detail', () => {
   beforeEach(() => {
     showInfo.mockReset()
@@ -201,7 +215,7 @@ describe('KeyUsageView daily detail', () => {
     expect(text).toContain('200')
     expect(text).toContain('30')
     expect(text).toContain('10')
-    expect(text).toContain('$0.12')
+    expect(text).toContain('$0.120000')
 
     wrapper.unmount()
   })

@@ -33,7 +33,7 @@
               min="0"
               step="0.01"
               class="input flex-1"
-              :placeholder="systemDefaultThreshold > 0 ? `${t('profile.balanceNotify.systemDefault')} $${systemDefaultThreshold}` : t('profile.balanceNotify.thresholdPlaceholder')"
+              :placeholder="systemDefaultThreshold > 0 ? `${t('profile.balanceNotify.systemDefault')} ${currencyStore.currencySymbol}${systemDefaultThreshold}` : t('profile.balanceNotify.thresholdPlaceholder')"
             />
             <button
               @click="handleThresholdUpdate"
@@ -161,6 +161,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
+import { useCurrencyStore } from '@/stores/currency'
 import { userAPI } from '@/api'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import type { NotifyEmailEntry } from '@/types'
@@ -188,6 +189,7 @@ const props = defineProps<{
 const { t } = useI18n()
 const authStore = useAuthStore()
 const appStore = useAppStore()
+const currencyStore = useCurrencyStore()
 
 const notifyEnabled = ref(props.enabled)
 const customThreshold = ref<number | null>(props.threshold)

@@ -838,6 +838,8 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		SettingKeyAffiliateEnabled,
 		SettingKeyRiskControlEnabled,
 		SettingKeyAllowUserViewErrorRequests,
+		SettingKeyDefaultDisplayCurrency,
+		SettingKeyDefaultExchangeRate,
 	}
 
 	settings, err := s.settingRepo.GetMultiple(ctx, keys)
@@ -952,6 +954,9 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		RiskControlEnabled: settings[SettingKeyRiskControlEnabled] == "true",
 
 		AllowUserViewErrorRequests: settings[SettingKeyAllowUserViewErrorRequests] == "true",
+
+		DefaultDisplayCurrency: strings.TrimSpace(settings[SettingKeyDefaultDisplayCurrency]),
+		DefaultExchangeRate:    parseDefaultExchangeRate(settings[SettingKeyDefaultExchangeRate]),
 	}, nil
 }
 
@@ -971,6 +976,16 @@ func parseChannelMonitorInterval(raw string) int {
 		return channelMonitorIntervalFallback
 	}
 	return clampChannelMonitorInterval(v)
+}
+
+// parseDefaultExchangeRate parses the stored exchange rate string.
+// Negative or invalid values return 0 (meaning "not configured", frontend falls back to USD).
+func parseDefaultExchangeRate(raw string) float64 {
+	v, err := strconv.ParseFloat(strings.TrimSpace(raw), 64)
+	if err != nil || v < 0 {
+		return 0
+	}
+	return v
 }
 
 // clampChannelMonitorInterval clamps v to the allowed range. 0 means "not provided".
@@ -1479,6 +1494,9 @@ type PublicSettingsInjectionPayload struct {
 	AffiliateEnabled                     bool `json:"affiliate_enabled"`
 	RiskControlEnabled                   bool `json:"risk_control_enabled"`
 	AllowUserViewErrorRequests           bool `json:"allow_user_view_error_requests"`
+
+	DefaultDisplayCurrency string  `json:"default_display_currency"`
+	DefaultExchangeRate    float64 `json:"default_exchange_rate"`
 }
 
 // GetPublicSettingsForInjection returns public settings in a format suitable for HTML injection.
@@ -1544,6 +1562,9 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 		AffiliateEnabled:                     settings.AffiliateEnabled,
 		RiskControlEnabled:                   settings.RiskControlEnabled,
 		AllowUserViewErrorRequests:           settings.AllowUserViewErrorRequests,
+
+		DefaultDisplayCurrency: settings.DefaultDisplayCurrency,
+		DefaultExchangeRate:    settings.DefaultExchangeRate,
 	}, nil
 }
 
@@ -2251,6 +2272,9 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 	}
 
 	updates[SettingKeyAllowUserViewErrorRequests] = strconv.FormatBool(settings.AllowUserViewErrorRequests)
+
+	updates[SettingKeyDefaultDisplayCurrency] = strings.TrimSpace(settings.DefaultDisplayCurrency)
+	updates[SettingKeyDefaultExchangeRate] = strconv.FormatFloat(settings.DefaultExchangeRate, 'f', 8, 64)
 
 	return updates, nil
 }
@@ -3209,6 +3233,9 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		openAIAdvancedSchedulerSettingKey:            "false",
 
 		SettingKeyAllowUserViewErrorRequests: "false",
+
+		SettingKeyDefaultDisplayCurrency: "",
+		SettingKeyDefaultExchangeRate:    "0",
 	}
 
 	return s.settingRepo.SetMultiple(ctx, defaults)
@@ -3798,6 +3825,9 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 	}
 
 	result.AllowUserViewErrorRequests = settings[SettingKeyAllowUserViewErrorRequests] == "true" // default false
+
+	result.DefaultDisplayCurrency = strings.TrimSpace(settings[SettingKeyDefaultDisplayCurrency])
+	result.DefaultExchangeRate = parseDefaultExchangeRate(settings[SettingKeyDefaultExchangeRate])
 
 	return result
 }

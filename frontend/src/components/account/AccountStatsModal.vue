@@ -69,14 +69,14 @@
               </div>
             </div>
             <p class="text-2xl font-bold text-gray-900 dark:text-white">
-              ${{ formatCost(stats.summary.total_cost) }}
+              {{ usd(stats.summary.total_cost) }}
             </p>
             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
               {{ t('admin.accounts.stats.accumulatedCost') }}
               <span class="text-gray-400 dark:text-gray-500">
-                ({{ t('usage.userBilled') }}: ${{ formatCost(stats.summary.total_user_cost) }} ·
-                {{ t('admin.accounts.stats.standardCost') }}: ${{
-                  formatCost(stats.summary.total_standard_cost)
+                ({{ t('usage.userBilled') }}: {{ usd(stats.summary.total_user_cost) }} ·
+                {{ t('admin.accounts.stats.standardCost') }}: {{
+                  usd(stats.summary.total_standard_cost)
                 }})
               </span>
             </p>
@@ -120,7 +120,7 @@
               </div>
             </div>
             <p class="text-2xl font-bold text-gray-900 dark:text-white">
-              ${{ formatCost(stats.summary.avg_daily_cost) }}
+              {{ usd(stats.summary.avg_daily_cost) }}
             </p>
              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
               {{
@@ -129,7 +129,7 @@
                 })
               }}
               <span class="text-gray-400 dark:text-gray-500">
-                ({{ t('usage.userBilled') }}: ${{ formatCost(stats.summary.avg_daily_user_cost) }})
+                ({{ t('usage.userBilled') }}: {{ usd(stats.summary.avg_daily_user_cost) }})
               </span>
             </p>
           </div>
@@ -195,13 +195,13 @@
               <div class="flex items-center justify-between">
                 <span class="text-xs text-gray-500 dark:text-gray-400">{{ t('usage.accountBilled') }}</span>
                 <span class="text-sm font-semibold text-gray-900 dark:text-white"
-                  >${{ formatCost(stats.summary.today?.cost || 0) }}</span
+                  >{{ usd(stats.summary.today?.cost || 0) }}</span
                 >
               </div>
               <div class="flex items-center justify-between">
                 <span class="text-xs text-gray-500 dark:text-gray-400">{{ t('usage.userBilled') }}</span>
                 <span class="text-sm font-semibold text-gray-900 dark:text-white"
-                  >${{ formatCost(stats.summary.today?.user_cost || 0) }}</span
+                  >{{ usd(stats.summary.today?.user_cost || 0) }}</span
                 >
               </div>
               <div class="flex items-center justify-between">
@@ -250,13 +250,13 @@
               <div class="flex items-center justify-between">
                 <span class="text-xs text-gray-500 dark:text-gray-400">{{ t('usage.accountBilled') }}</span>
                 <span class="text-sm font-semibold text-orange-600 dark:text-orange-400"
-                  >${{ formatCost(stats.summary.highest_cost_day?.cost || 0) }}</span
+                  >{{ usd(stats.summary.highest_cost_day?.cost || 0) }}</span
                 >
               </div>
               <div class="flex items-center justify-between">
                 <span class="text-xs text-gray-500 dark:text-gray-400">{{ t('usage.userBilled') }}</span>
                 <span class="text-sm font-semibold text-gray-900 dark:text-white"
-                  >${{ formatCost(stats.summary.highest_cost_day?.user_cost || 0) }}</span
+                  >{{ usd(stats.summary.highest_cost_day?.user_cost || 0) }}</span
                 >
               </div>
               <div class="flex items-center justify-between">
@@ -305,13 +305,13 @@
               <div class="flex items-center justify-between">
                 <span class="text-xs text-gray-500 dark:text-gray-400">{{ t('usage.accountBilled') }}</span>
                 <span class="text-sm font-semibold text-gray-900 dark:text-white"
-                  >${{ formatCost(stats.summary.highest_request_day?.cost || 0) }}</span
+                  >{{ usd(stats.summary.highest_request_day?.cost || 0) }}</span
                 >
               </div>
               <div class="flex items-center justify-between">
                 <span class="text-xs text-gray-500 dark:text-gray-400">{{ t('usage.userBilled') }}</span>
                 <span class="text-sm font-semibold text-gray-900 dark:text-white"
-                  >${{ formatCost(stats.summary.highest_request_day?.user_cost || 0) }}</span
+                  >{{ usd(stats.summary.highest_request_day?.user_cost || 0) }}</span
                 >
               </div>
             </div>
@@ -415,13 +415,13 @@
               <div class="flex items-center justify-between">
                 <span class="text-xs text-gray-500 dark:text-gray-400">{{ t('usage.accountBilled') }}</span>
                 <span class="text-sm font-semibold text-gray-900 dark:text-white"
-                  >${{ formatCost(stats.summary.today?.cost || 0) }}</span
+                  >{{ usd(stats.summary.today?.cost || 0) }}</span
                 >
               </div>
               <div class="flex items-center justify-between">
                 <span class="text-xs text-gray-500 dark:text-gray-400">{{ t('usage.userBilled') }}</span>
                 <span class="text-sm font-semibold text-gray-900 dark:text-white"
-                  >${{ formatCost(stats.summary.today?.user_cost || 0) }}</span
+                  >{{ usd(stats.summary.today?.user_cost || 0) }}</span
                 >
               </div>
             </div>
@@ -504,6 +504,7 @@ import ModelDistributionChart from '@/components/charts/ModelDistributionChart.v
 import EndpointDistributionChart from '@/components/charts/EndpointDistributionChart.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { adminAPI } from '@/api/admin'
+import { useCurrencyStore } from '@/stores/currency'
 import type { Account, AccountUsageStatsResponse } from '@/types'
 
 ChartJS.register(
@@ -518,6 +519,8 @@ ChartJS.register(
 )
 
 const { t } = useI18n()
+
+const currencyStore = useCurrencyStore()
 
 const props = defineProps<{
   show: boolean
@@ -608,7 +611,7 @@ const lineChartOptions = computed(() => ({
           const label = context.dataset.label || ''
           const value = context.raw
           if (label.includes('USD')) {
-            return `${label}: $${formatCost(value)}`
+            return `${label}: ${currencyStore.formatAmount(value)}`
           }
           return `${label}: ${formatNumber(value)}`
         }
@@ -641,7 +644,7 @@ const lineChartOptions = computed(() => ({
         font: {
           size: 10
         },
-        callback: (value: string | number) => '$' + formatCost(Number(value))
+        callback: (value: string | number) => currencyStore.formatAmount(Number(value))
       },
       title: {
         display: true,
@@ -709,15 +712,9 @@ const handleClose = () => {
 }
 
 // Format helpers
-const formatCost = (value: number): string => {
-  if (value >= 1000) {
-    return (value / 1000).toFixed(2) + 'K'
-  } else if (value >= 1) {
-    return value.toFixed(2)
-  } else if (value >= 0.01) {
-    return value.toFixed(3)
-  }
-  return value.toFixed(4)
+function usd(value: number | null | undefined): string {
+  if (value == null || value < 0) return '-'
+  return currencyStore.formatAmount(value)
 }
 
 const formatNumber = (value: number): string => {

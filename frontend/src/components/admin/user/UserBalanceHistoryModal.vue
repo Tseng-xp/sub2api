@@ -31,7 +31,7 @@
           <div class="flex-shrink-0 text-right">
             <p class="text-xs text-gray-500 dark:text-dark-400">{{ t('admin.users.currentBalance') }}</p>
             <p class="text-xl font-bold text-gray-900 dark:text-white">
-              ${{ user.balance?.toFixed(2) || '0.00' }}
+              {{ currencyStore.currencySymbol }}{{ user.balance?.toFixed(2) || '0.00' }}
             </p>
           </div>
         </div>
@@ -42,7 +42,7 @@
             <template v-else>&nbsp;</template>
           </p>
           <p class="ml-4 flex-shrink-0 text-xs text-gray-500 dark:text-dark-400">
-            {{ t('admin.users.totalRecharged') }}: <span class="font-semibold text-emerald-600 dark:text-emerald-400">${{ totalRecharged.toFixed(2) }}</span>
+            {{ t('admin.users.totalRecharged') }}: <span class="font-semibold text-emerald-600 dark:text-emerald-400">{{ currencyStore.currencySymbol }}{{ totalRecharged.toFixed(2) }}</span>
           </p>
         </div>
       </div>
@@ -176,6 +176,7 @@ import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { adminAPI, type BalanceHistoryItem } from '@/api/admin'
 import { formatDateTime } from '@/utils/format'
+import { useCurrencyStore } from '@/stores/currency'
 import type { AdminUser } from '@/types'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Select from '@/components/common/Select.vue'
@@ -184,6 +185,7 @@ import Icon from '@/components/icons/Icon.vue'
 const props = defineProps<{ show: boolean; user: AdminUser | null; hideActions?: boolean }>()
 const emit = defineEmits(['close', 'deposit', 'withdraw'])
 const { t } = useI18n()
+const currencyStore = useCurrencyStore()
 
 const history = ref<BalanceHistoryItem[]>([])
 const loading = ref(false)

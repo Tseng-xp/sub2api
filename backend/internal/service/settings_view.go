@@ -237,6 +237,10 @@ type SystemSettings struct {
 
 	// 允许终端用户在用量页查看自己的失败请求
 	AllowUserViewErrorRequests bool
+
+	// 货币展示配置
+	DefaultDisplayCurrency string  // 默认展示货币（"USD" 或 "CNY"，空 = USD）
+	DefaultExchangeRate    float64 // 默认汇率（1 USD = ? CNY），0 = 未配置
 }
 
 type DefaultSubscriptionSetting struct {
@@ -310,6 +314,10 @@ type PublicSettings struct {
 
 	// 允许终端用户在用量页查看自己的失败请求
 	AllowUserViewErrorRequests bool `json:"allow_user_view_error_requests"`
+
+	// 货币展示配置
+	DefaultDisplayCurrency string  `json:"default_display_currency"`
+	DefaultExchangeRate    float64 `json:"default_exchange_rate"`
 }
 
 type LoginAgreementDocument struct {

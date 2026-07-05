@@ -4,6 +4,7 @@ interface TokenPriceFormatOptions {
   fractionDigits?: number
   withCurrencySymbol?: boolean
   emptyValue?: string
+  currencySymbol?: string
 }
 
 function isFiniteNumber(value: unknown): value is number {
@@ -45,5 +46,7 @@ export function formatTokenPricePerMillion(
 
   const fractionDigits = options.fractionDigits ?? 4
   const formatted = pricePerMillion.toFixed(fractionDigits)
-  return options.withCurrencySymbol == false ? formatted : `$${formatted}`
+  if (options.withCurrencySymbol == false) return formatted
+  const symbol = options.currencySymbol ?? '$'
+  return `${symbol}${formatted}`
 }

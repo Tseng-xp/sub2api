@@ -38,8 +38,8 @@
           <span class="hidden sm:inline">{{ t('nav.docs') }}</span>
         </a>
 
-        <!-- Currency Switcher -->
-        <CurrencySwitcher />
+        <!-- Currency Switcher (admin only) -->
+        <CurrencySwitcher v-if="authStore.isAdmin" />
 
         <!-- Language Switcher -->
         <LocaleSwitcher />

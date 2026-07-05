@@ -107,8 +107,8 @@
                   {{ t('userSubscriptions.daily') }}
                 </span>
                 <span class="text-sm text-gray-500 dark:text-dark-400">
-                  ${{ (subscription.daily_usage_usd || 0).toFixed(2) }} / ${{
-                    subscription.group.daily_limit_usd.toFixed(2)
+                  {{ usd(subscription.daily_usage_usd || 0) }} / {{
+                    usd(subscription.group.daily_limit_usd)
                   }}
                 </span>
               </div>
@@ -144,8 +144,8 @@
                   {{ t('userSubscriptions.weekly') }}
                 </span>
                 <span class="text-sm text-gray-500 dark:text-dark-400">
-                  ${{ (subscription.weekly_usage_usd || 0).toFixed(2) }} / ${{
-                    subscription.group.weekly_limit_usd.toFixed(2)
+                  {{ usd(subscription.weekly_usage_usd || 0) }} / {{
+                    usd(subscription.group.weekly_limit_usd)
                   }}
                 </span>
               </div>
@@ -185,8 +185,8 @@
                   {{ t('userSubscriptions.monthly') }}
                 </span>
                 <span class="text-sm text-gray-500 dark:text-dark-400">
-                  ${{ (subscription.monthly_usage_usd || 0).toFixed(2) }} / ${{
-                    subscription.group.monthly_limit_usd.toFixed(2)
+                  {{ usd(subscription.monthly_usage_usd || 0) }} / {{
+                    usd(subscription.group.monthly_limit_usd)
                   }}
                 </span>
               </div>
@@ -252,6 +252,7 @@ import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
+import { useCurrencyStore } from '@/stores/currency'
 import subscriptionsAPI from '@/api/subscriptions'
 import type { UserSubscription } from '@/types'
 import AppLayout from '@/components/layout/AppLayout.vue'
@@ -274,6 +275,12 @@ function platformAccentDotClass(p: string): string {
 const { t } = useI18n()
 const router = useRouter()
 const appStore = useAppStore()
+const currencyStore = useCurrencyStore()
+
+function usd(value: number | null | undefined): string {
+  if (value == null || value < 0) return '-'
+  return currencyStore.formatAmount(value)
+}
 
 const subscriptions = ref<UserSubscription[]>([])
 const loading = ref(true)

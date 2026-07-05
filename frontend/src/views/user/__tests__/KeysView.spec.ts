@@ -2,6 +2,20 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { nextTick } from 'vue'
 
+vi.mock('@/stores/currency', () => ({
+  useCurrencyStore: () => ({
+    displayCurrency: 'USD',
+    exchangeRate: 0,
+    currencySymbol: '$',
+    currencyCode: 'USD',
+    formatAmount: (amount: number | null | undefined) => {
+      if (amount == null || amount < 0) return '-'
+      return '$' + amount.toFixed(6)
+    },
+    convertAmount: (amount: number | null | undefined) => amount ?? 0,
+  }),
+}))
+
 import type { ApiKey } from '@/types'
 import KeysView from '../KeysView.vue'
 

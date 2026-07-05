@@ -370,7 +370,7 @@
               {{ formatWindowTokens(grokLocalUsage) }}
             </span>
             <span class="rounded bg-gray-100 px-1.5 py-0.5 dark:bg-gray-800" :title="t('usage.accountBilled')">
-              A ${{ formatWindowCost(grokLocalUsage) }}
+              A {{ currencyStore.currencySymbol }}{{ formatWindowCost(grokLocalUsage) }}
             </span>
           </div>
         </div>
@@ -464,14 +464,14 @@
               {{ formatKeyTokens }}
             </span>
             <span class="rounded bg-gray-100 px-1.5 py-0.5 dark:bg-gray-800" :title="t('usage.accountBilled')">
-              A ${{ formatKeyCost }}
+              A {{ currencyStore.currencySymbol }}{{ formatKeyCost }}
             </span>
             <span
               v-if="todayStats.user_cost != null"
               class="rounded bg-gray-100 px-1.5 py-0.5 dark:bg-gray-800"
               :title="t('usage.userBilled')"
             >
-              U ${{ formatKeyUserCost }}
+              U {{ currencyStore.currencySymbol }}{{ formatKeyUserCost }}
             </span>
           </div>
         </div>
@@ -540,14 +540,14 @@
             {{ formatKeyTokens }}
           </span>
           <span class="rounded bg-gray-100 px-1.5 py-0.5 dark:bg-gray-800" :title="t('usage.accountBilled')">
-            A ${{ formatKeyCost }}
+            A {{ currencyStore.currencySymbol }}{{ formatKeyCost }}
           </span>
           <span
             v-if="todayStats.user_cost != null"
             class="rounded bg-gray-100 px-1.5 py-0.5 dark:bg-gray-800"
             :title="t('usage.userBilled')"
           >
-            U ${{ formatKeyUserCost }}
+            U {{ currencyStore.currencySymbol }}{{ formatKeyUserCost }}
           </span>
         </div>
       </div>
@@ -593,6 +593,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { adminAPI } from '@/api/admin'
+import { useCurrencyStore } from '@/stores/currency'
 import type { Account, AccountUsageInfo, GeminiCredentials, WindowStats } from '@/types'
 import { buildOpenAIUsageRefreshKey } from '@/utils/accountUsageRefresh'
 import { enqueueUsageRequest } from '@/utils/usageLoadQueue'
@@ -621,6 +622,7 @@ const props = withDefaults(
 )
 
 const { t } = useI18n()
+const currencyStore = useCurrencyStore()
 const desktopViewportQuery = '(min-width: 768px)'
 
 const unmounted = ref(false)

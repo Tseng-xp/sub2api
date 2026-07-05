@@ -57,7 +57,7 @@
             </div>
             <div v-if="hasAmountFields(order) && order.amount !== order.pay_amount" class="flex justify-between">
               <span class="text-gray-500 dark:text-gray-400">{{ t('payment.orders.creditedAmount') }}</span>
-              <span class="font-medium text-gray-900 dark:text-white">{{ order.order_type === 'balance' ? '$' + order.amount.toFixed(2) : formatGatewayAmount(order.amount) }}</span>
+              <span class="font-medium text-gray-900 dark:text-white">{{ order.order_type === 'balance' ? currencyStore.formatAmount(order.amount) : formatGatewayAmount(order.amount) }}</span>
             </div>
             <div v-if="hasPaymentType(order)" class="flex justify-between">
               <span class="text-gray-500 dark:text-gray-400">{{ t('payment.orders.paymentMethod') }}</span>
@@ -107,6 +107,7 @@ import {
   readPaymentRecoverySnapshot,
 } from '@/components/payment/paymentFlow'
 import { usePaymentStore } from '@/stores/payment'
+import { useCurrencyStore } from '@/stores/currency'
 import { paymentAPI } from '@/api/payment'
 import type { PublicOrderVerifyResult } from '@/api/payment'
 import type { OrderStatus, PaymentOrder } from '@/types/payment'
@@ -118,6 +119,7 @@ const { t } = i18n
 const route = useRoute()
 const router = useRouter()
 const paymentStore = usePaymentStore()
+const currencyStore = useCurrencyStore()
 
 type ResolvedOrder = PaymentOrder | PublicOrderVerifyResult
 

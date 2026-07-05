@@ -20,7 +20,7 @@
           </div>
           <div class="text-right">
             <span class="text-sm font-medium text-gray-900 dark:text-white">
-              ${{ method.amount.toFixed(2) }}
+              {{ currencyStore.currencySymbol }}{{ method.amount.toFixed(2) }}
             </span>
             <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">
               ({{ method.count }})
@@ -41,8 +41,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useCurrencyStore } from '@/stores/currency'
 
 const { t } = useI18n()
+const currencyStore = useCurrencyStore()
 
 const props = defineProps<{
   methods: { type: string; amount: number; count: number }[]

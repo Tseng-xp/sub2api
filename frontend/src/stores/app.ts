@@ -13,6 +13,7 @@ import {
   type ReleaseInfo
 } from '@/api/admin/system'
 import { getPublicSettings as fetchPublicSettingsAPI } from '@/api/auth'
+import { useCurrencyStore } from './currency'
 
 export const useAppStore = defineStore('app', () => {
   // ==================== State ====================
@@ -299,6 +300,8 @@ export const useAppStore = defineStore('app', () => {
     apiBaseUrl.value = config.api_base_url || ''
     docUrl.value = config.doc_url || ''
     publicSettingsLoaded.value = true
+
+    useCurrencyStore().initFromInjectedConfig(config)
   }
 
   /**

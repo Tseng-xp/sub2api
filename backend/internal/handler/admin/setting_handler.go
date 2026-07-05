@@ -310,6 +310,9 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		AffiliateEnabled: settings.AffiliateEnabled,
 
 		AllowUserViewErrorRequests: settings.AllowUserViewErrorRequests,
+
+		DefaultDisplayCurrency: settings.DefaultDisplayCurrency,
+		DefaultExchangeRate:    settings.DefaultExchangeRate,
 	}
 
 	// OpenAI fast policy (stored under a dedicated setting key)
@@ -688,6 +691,9 @@ type UpdateSettingsRequest struct {
 	AuthSourceDingTalkPlatformQuotas map[string]*service.DefaultPlatformQuotaSetting `json:"auth_source_default_dingtalk_platform_quotas"`
 
 	AllowUserViewErrorRequests *bool `json:"allow_user_view_error_requests"`
+
+	DefaultDisplayCurrency *string  `json:"default_display_currency"`
+	DefaultExchangeRate    *float64 `json:"default_exchange_rate"`
 }
 
 // UpdateSettings 更新系统设置
@@ -1661,6 +1667,21 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 			}
 			return previousSettings.AllowUserViewErrorRequests
 		}(),
+		DefaultDisplayCurrency: func() string {
+			if req.DefaultDisplayCurrency != nil {
+				return strings.TrimSpace(*req.DefaultDisplayCurrency)
+			}
+			return previousSettings.DefaultDisplayCurrency
+		}(),
+		DefaultExchangeRate: func() float64 {
+			if req.DefaultExchangeRate != nil {
+				if *req.DefaultExchangeRate < 0 {
+					return 0
+				}
+				return *req.DefaultExchangeRate
+			}
+			return previousSettings.DefaultExchangeRate
+		}(),
 		OpsMonitoringEnabled: func() bool {
 			if req.OpsMonitoringEnabled != nil {
 				return *req.OpsMonitoringEnabled
@@ -2204,6 +2225,9 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		CyberSessionBlockEnabled:    updatedSettings.CyberSessionBlockEnabled,
 		CyberSessionBlockTTLSeconds: updatedSettings.CyberSessionBlockTTLSeconds,
 		AllowUserViewErrorRequests:  updatedSettings.AllowUserViewErrorRequests,
+
+		DefaultDisplayCurrency: updatedSettings.DefaultDisplayCurrency,
+		DefaultExchangeRate:    updatedSettings.DefaultExchangeRate,
 	}
 	if fastPolicy, err := h.settingService.GetOpenAIFastPolicySettings(c.Request.Context()); err != nil {
 		slog.Error("openai_fast_policy_settings_get_failed", "error", err)

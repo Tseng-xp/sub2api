@@ -29,8 +29,8 @@
         </template>
         <template #cell-price="{ value, row }">
           <div class="text-sm">
-            <span class="font-medium text-gray-900 dark:text-white">${{ (value ?? 0).toFixed(2) }}</span>
-            <span v-if="row.original_price" class="ml-1 text-xs text-gray-400 line-through">${{ row.original_price.toFixed(2) }}</span>
+            <span class="font-medium text-gray-900 dark:text-white">{{ currencyStore.currencySymbol }}{{ (value ?? 0).toFixed(2) }}</span>
+            <span v-if="row.original_price" class="ml-1 text-xs text-gray-400 line-through">{{ currencyStore.currencySymbol }}{{ row.original_price.toFixed(2) }}</span>
           </div>
         </template>
         <template #cell-validity_days="{ value, row }">
@@ -77,6 +77,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
+import { useCurrencyStore } from '@/stores/currency'
 import { adminPaymentAPI } from '@/api/admin/payment'
 import { extractI18nErrorMessage } from '@/utils/apiError'
 import adminAPI from '@/api/admin'
@@ -92,6 +93,7 @@ import PlanEditDialog from './PlanEditDialog.vue'
 import { platformTextClass } from '@/utils/platformColors'
 
 const { t } = useI18n()
+const currencyStore = useCurrencyStore()
 const appStore = useAppStore()
 
 // ==================== Groups ====================

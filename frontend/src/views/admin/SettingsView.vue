@@ -3123,6 +3123,39 @@
                     {{ t("admin.settings.defaults.defaultUserRpmLimitHint") }}
                   </p>
                 </div>
+                <div>
+                  <label
+                    class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >
+                    {{ t("admin.settings.defaults.defaultDisplayCurrency") }}
+                  </label>
+                  <select v-model="form.default_display_currency" class="input">
+                    <option value="">{{ t("admin.settings.defaults.currencyAuto") }}</option>
+                    <option value="USD">USD ($)</option>
+                    <option value="CNY">CNY (¥)</option>
+                  </select>
+                  <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                    {{ t("admin.settings.defaults.defaultDisplayCurrencyHint") }}
+                  </p>
+                </div>
+                <div>
+                  <label
+                    class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >
+                    {{ t("admin.settings.defaults.defaultExchangeRate") }}
+                  </label>
+                  <input
+                    v-model.number="form.default_exchange_rate"
+                    type="number"
+                    step="0.0001"
+                    min="0"
+                    class="input"
+                    placeholder="0"
+                  />
+                  <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                    {{ t("admin.settings.defaults.defaultExchangeRateHint") }}
+                  </p>
+                </div>
               </div>
 
               <div class="border-t border-gray-100 pt-4 dark:border-dark-700">
@@ -7930,6 +7963,8 @@ const form = reactive<SettingsForm>({
   default_subscriptions: [],
   force_email_on_third_party_signup: false,
   default_user_rpm_limit: 0,
+  default_display_currency: '',
+  default_exchange_rate: 0,
   site_name: "Sub2API",
   site_logo: "",
   site_subtitle: "Subscription to API Conversion Platform",
@@ -9174,6 +9209,8 @@ async function saveSettings() {
       default_subscriptions: normalizedDefaultSubscriptions,
       force_email_on_third_party_signup: form.force_email_on_third_party_signup,
       default_user_rpm_limit: form.default_user_rpm_limit,
+      default_display_currency: form.default_display_currency || '',
+      default_exchange_rate: Math.max(0, Number(form.default_exchange_rate) || 0),
       site_name: form.site_name,
       site_logo: form.site_logo,
       site_subtitle: form.site_subtitle,

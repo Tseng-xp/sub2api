@@ -178,7 +178,7 @@
                   "
                 >
                   <span v-if="row.daily_limit_usd"
-                    >${{ row.daily_limit_usd }}/{{
+                    >{{ currencyStore.currencySymbol }}{{ row.daily_limit_usd }}/{{
                       t("admin.groups.limitDay")
                     }}</span
                   >
@@ -191,7 +191,7 @@
                     >·</span
                   >
                   <span v-if="row.weekly_limit_usd"
-                    >${{ row.weekly_limit_usd }}/{{
+                    >{{ currencyStore.currencySymbol }}{{ row.weekly_limit_usd }}/{{
                       t("admin.groups.limitWeek")
                     }}</span
                   >
@@ -201,7 +201,7 @@
                     >·</span
                   >
                   <span v-if="row.monthly_limit_usd"
-                    >${{ row.monthly_limit_usd }}/{{
+                    >{{ currencyStore.currencySymbol }}{{ row.monthly_limit_usd }}/{{
                       t("admin.groups.limitMonth")
                     }}</span
                   >
@@ -3178,6 +3178,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useAppStore } from "@/stores/app";
+import { useCurrencyStore } from "@/stores/currency";
 import { useOnboardingStore } from "@/stores/onboarding";
 import { adminAPI } from "@/api/admin";
 import type { AdminGroup, GroupPlatform, SubscriptionType } from "@/types";
@@ -3218,6 +3219,7 @@ import { createModelsListCandidatesTracker } from "./groupsModelsListCandidates"
 import { normalizeSupportedModelScopesForPlatform } from "./groupsSupportedModelScopes";
 
 const { t } = useI18n();
+const currencyStore = useCurrencyStore();
 const appStore = useAppStore();
 const onboardingStore = useOnboardingStore();
 

@@ -1,6 +1,20 @@
 import { describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 
+vi.mock('@/stores/currency', () => ({
+  useCurrencyStore: () => ({
+    displayCurrency: 'USD',
+    exchangeRate: 0,
+    currencySymbol: '$',
+    currencyCode: 'USD',
+    formatAmount: (amount: number | null | undefined) => {
+      if (amount == null || amount < 0) return '-'
+      return '$' + amount.toFixed(6)
+    },
+    convertAmount: (amount: number | null | undefined) => amount ?? 0,
+  }),
+}))
+
 import ModelDistributionChart from '../ModelDistributionChart.vue'
 
 const messages: Record<string, string> = {
