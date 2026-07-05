@@ -193,14 +193,4 @@ const formatTokens = computed(() => {
   return formatCompactNumber(props.windowStats.tokens)
 })
 
-const formatAccountCost = computed(() => {
-  if (!props.windowStats) return '0.00'
-  return props.windowStats.cost.toFixed(2)
-})
-
-const formatUserCost = computed(() => {
-  if (!props.windowStats || props.windowStats.user_cost == null) return '0.00'
-  return props.windowStats.user_cost.toFixed(2)
-})
-
 </script>

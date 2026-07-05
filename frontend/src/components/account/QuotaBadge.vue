@@ -33,7 +33,6 @@ const tooltip = computed(() => {
   return t('admin.accounts.capacity.quota.normal')
 })
 
-const fmt = (v: number) => v.toFixed(2)
 </script>
 
 <template>

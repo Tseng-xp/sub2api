@@ -357,17 +357,6 @@ function quotaBarClass(p: number): string {
   return 'bg-green-500'
 }
 
-// 与 formatBalance 一致使用 Intl.NumberFormat 做半偶舍入，避免 toFixed 在不同 JS 引擎
-// 下偶发截断而非四舍五入（与后端展示精度不一致）。
-const usdFormatter = new Intl.NumberFormat('en-US', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-})
-function formatUsd(n: number): string {
-  if (!Number.isFinite(n)) return '0.00'
-  return usdFormatter.format(n)
-}
-
 function formatResetTime(iso: string | null | undefined): string {
   if (!iso) return ''
   const d = new Date(iso)

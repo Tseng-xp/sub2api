@@ -1092,7 +1092,6 @@ const grokRetryAfterLabel = computed(() => {
 
 const formatWindowRequests = (stats: WindowStats) => formatCompactNumber(stats.requests, { allowBillions: false })
 const formatWindowTokens = (stats: WindowStats) => formatCompactNumber(stats.tokens)
-const formatWindowCost = (stats: WindowStats) => stats.cost.toFixed(2)
 
 // 账户类型显示标签
 const antigravityTierLabel = computed(() => {
@@ -1356,15 +1355,7 @@ const formatKeyTokens = computed(() => {
   return formatCompactNumber(props.todayStats.tokens)
 })
 
-const formatKeyCost = computed(() => {
-  if (!props.todayStats) return '0.00'
-  return props.todayStats.cost.toFixed(2)
-})
 
-const formatKeyUserCost = computed(() => {
-  if (!props.todayStats || props.todayStats.user_cost == null) return '0.00'
-  return props.todayStats.user_cost.toFixed(2)
-})
 
 onMounted(() => {
   if (typeof window !== 'undefined') {
