@@ -38,8 +38,7 @@
           <span class="hidden sm:inline">{{ t('nav.docs') }}</span>
         </a>
 
-        <!-- Currency Switcher (admin only) -->
-        <CurrencySwitcher v-if="authStore.isAdmin" />
+        
 
         <!-- Language Switcher -->
         <LocaleSwitcher />
@@ -223,7 +222,6 @@ import { useAppStore, useAuthStore, useOnboardingStore } from '@/stores'
 import { useCurrencyStore } from '@/stores/currency'
 import { useAdminSettingsStore } from '@/stores/adminSettings'
 import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
-import CurrencySwitcher from '@/components/common/CurrencySwitcher.vue'
 import SubscriptionProgressMini from '@/components/common/SubscriptionProgressMini.vue'
 import AnnouncementBell from '@/components/common/AnnouncementBell.vue'
 import Icon from '@/components/icons/Icon.vue'
