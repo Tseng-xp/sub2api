@@ -262,10 +262,10 @@ const (
 	SettingKeyCustomEndpoints             = "custom_endpoints"              // 自定义端点列表（JSON 数组）
 
 	// 默认配置
-	SettingKeyDefaultConcurrency     = "default_concurrency"     // 新用户默认并发量
-	SettingKeyDefaultBalance         = "default_balance"         // 新用户默认余额
-	SettingKeyDefaultSubscriptions   = "default_subscriptions"   // 新用户默认订阅列表（JSON）
-	SettingKeyDefaultUserRPMLimit    = "default_user_rpm_limit"  // 新用户默认 RPM 限制（0 = 不限制）
+	SettingKeyDefaultConcurrency     = "default_concurrency"      // 新用户默认并发量
+	SettingKeyDefaultBalance         = "default_balance"          // 新用户默认余额
+	SettingKeyDefaultSubscriptions   = "default_subscriptions"    // 新用户默认订阅列表（JSON）
+	SettingKeyDefaultUserRPMLimit    = "default_user_rpm_limit"   // 新用户默认 RPM 限制（0 = 不限制）
 	SettingKeyDefaultDisplayCurrency = "default_display_currency" // 默认展示货币（USD/CNY，空 = USD）
 	SettingKeyDefaultExchangeRate    = "default_exchange_rate"    // 默认汇率（1 USD = ? CNY），0 = 未配置
 
