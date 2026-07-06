@@ -55,6 +55,14 @@ pnpm-debug.log*
 !.env.example
 docker-compose.override.yml
 
+# IDE/Agent 生成的工作文档（可能含服务器信息，禁止入库）
+.trae/
+# 本地部署凭据（服务器 IP / root 密码等，绝不入库）
+deploy.local.env
+.deploy.env
+*.secret
+secrets.local.*
+
 # ===================
 # IDE / 编辑器
 # ===================
