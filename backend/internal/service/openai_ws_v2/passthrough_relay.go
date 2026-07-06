@@ -88,6 +88,10 @@ type relayState struct {
 	firstTokenMs      *int
 	turnTimingByID    map[string]*relayTurnTiming
 	activeTurn        *relayTurnTiming
+	// usageCountedByID 记录已累加过 usage 的 responseID。上游对同一响应可能发出
+	// 多个终止事件（如 response.done + response.completed，各带同一份累计 usage），
+	// 若每个都 += 会双倍计费。按 responseID 去重，只累加一次。
+	usageCountedByID map[string]bool
 }
 
 type relayExitSignal struct {
@@ -790,6 +794,19 @@ func parseUsageAndAccumulate(
 		CacheCreationInputTokens: int(usageResult.Get("cache_creation_input_tokens").Int()),
 		CacheReadInputTokens:     cachedTokens,
 		ImageOutputTokens:        int(imageTokens),
+	}
+
+	// 按 responseID 去重：同一响应的重复终止事件只累加一次，避免双倍计费。
+	// responseID 为空时无法去重，退回原有累加（保持多轮累加语义）。
+	responseID := strings.TrimSpace(gjson.GetBytes(message, "response.id").String())
+	if responseID != "" {
+		if state.usageCountedByID[responseID] {
+			return parsedUsage
+		}
+		if state.usageCountedByID == nil {
+			state.usageCountedByID = make(map[string]bool, 4)
+		}
+		state.usageCountedByID[responseID] = true
 	}
 
 	state.usage.InputTokens += parsedUsage.InputTokens

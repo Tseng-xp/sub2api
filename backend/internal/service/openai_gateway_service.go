@@ -220,6 +220,9 @@ type OpenAIUsage struct {
 	CacheCreationInputTokens int `json:"cache_creation_input_tokens,omitempty"`
 	CacheReadInputTokens     int `json:"cache_read_input_tokens,omitempty"`
 	ImageOutputTokens        int `json:"image_output_tokens,omitempty"`
+	// ServiceTier 记录上游响应实际采用的 service_tier（如 "flex"/"priority"/"default"）。
+	// 用于计费权威取值，避免客户端自选 flex 折扣（见 preferResponseServiceTier）。空表示响应未提供。
+	ServiceTier string `json:"-"`
 }
 
 // OpenAIForwardResult represents the result of forwarding
@@ -3385,7 +3388,7 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 			Model:           originalModel,
 			BillingModel:    billingModel,
 			UpstreamModel:   upstreamModel,
-			ServiceTier:     serviceTier,
+			ServiceTier:     preferResponseServiceTier(usage.ServiceTier, serviceTier),
 			ReasoningEffort: reasoningEffort,
 			Stream:          reqStream,
 			OpenAIWSMode:    false,
@@ -3622,7 +3625,7 @@ func (s *OpenAIGatewayService) forwardOpenAIPassthrough(
 		Usage:           *usage,
 		Model:           reqModel,
 		UpstreamModel:   upstreamPassthroughModel,
-		ServiceTier:     serviceTier,
+		ServiceTier:     preferResponseServiceTier(usage.ServiceTier, serviceTier),
 		ReasoningEffort: reasoningEffort,
 		Stream:          reqStream,
 		OpenAIWSMode:    false,
@@ -5569,8 +5572,10 @@ func (s *OpenAIGatewayService) parseSSEUsageBytes(data []byte, usage *OpenAIUsag
 	if usage == nil || len(data) == 0 || bytes.Equal(data, []byte("[DONE]")) {
 		return
 	}
-	// 选择性解析：仅在数据中包含终止事件标识时才进入字段提取。
-	if len(data) < 72 {
+	// 选择性解析：仅在数据中包含 usage 字段时才进入字段提取。
+	// 不能用固定字节长度短路（紧凑的终止帧如 {"type":"response.done","usage":{...}}
+	// 可能不足 72 字节而被整帧跳过，导致兼容上游的用量记为 0）。
+	if !bytes.Contains(data, []byte("usage")) {
 		return
 	}
 	eventType := gjson.GetBytes(data, "type").String()
@@ -5588,10 +5593,25 @@ func extractOpenAIUsageFromJSONBytes(body []byte) (OpenAIUsage, bool) {
 	if len(body) == 0 || !gjson.ValidBytes(body) {
 		return OpenAIUsage{}, false
 	}
+	tier := openAIResponseServiceTierFromBody(body)
 	if usage, ok := openAIUsageFromGJSON(gjson.GetBytes(body, "usage")); ok {
+		usage.ServiceTier = tier
 		return usage, true
 	}
-	return openAIUsageFromGJSON(gjson.GetBytes(body, "response.usage"))
+	usage, ok := openAIUsageFromGJSON(gjson.GetBytes(body, "response.usage"))
+	if ok {
+		usage.ServiceTier = tier
+	}
+	return usage, ok
+}
+
+// openAIResponseServiceTierFromBody 读取响应体里上游实际采用的 service_tier
+// （Responses/Chat 对象为顶层 service_tier，SSE 终止帧为 response.service_tier）。
+func openAIResponseServiceTierFromBody(body []byte) string {
+	if tier := strings.TrimSpace(gjson.GetBytes(body, "service_tier").String()); tier != "" {
+		return tier
+	}
+	return strings.TrimSpace(gjson.GetBytes(body, "response.service_tier").String())
 }
 
 func extractOpenAIResponseIDFromJSONBytes(body []byte) string {
@@ -6559,6 +6579,8 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	}()
 
 	if billingErr != nil {
+		// 计费失败也写审计行，避免请求已服务却无记录。usage_log 按 request_id 去重，幂等安全。
+		writeUsageLogBestEffort(ctx, s.usageLogRepo, usageLog, "service.openai_gateway")
 		return billingErr
 	}
 	writeUsageLogBestEffort(ctx, s.usageLogRepo, usageLog, "service.openai_gateway")
@@ -6586,6 +6608,23 @@ func (s *OpenAIGatewayService) calculateOpenAIRecordUsageCost(
 	if len(billingModels) == 0 || billingModel == "" {
 		return nil, errors.New("openai usage billing model is empty")
 	}
+	// 第一优先：选用命中管理员渠道定价的候选。
+	// 否则账号映射 / BillingModelSource=upstream 产生的别名会先命中硬编码兜底价，
+	// 候选循环"第一个不报错就返回"便会停在该别名上，导致 glm-5.1 等配了渠道价的模型
+	// 被错误地按兜底价计费（原始请求名 glm-5.1 永远不会被尝试）。
+	for _, candidate := range billingModels {
+		candidate = strings.TrimSpace(candidate)
+		if candidate == "" {
+			continue
+		}
+		if s.resolveOpenAIChannelPricing(ctx, candidate, apiKey) == nil {
+			continue
+		}
+		if cost, err := s.calculateOpenAIRecordUsageTokenCost(ctx, apiKey, candidate, multiplier, tokens, serviceTier); err == nil {
+			return cost, nil
+		}
+	}
+	// 无候选命中渠道价，退回原有"第一个可定价即用"逻辑（LiteLLM / 兜底价）。
 	var lastErr error
 	for _, candidate := range billingModels {
 		candidate = strings.TrimSpace(candidate)
@@ -7226,6 +7265,17 @@ func normalizeOpenAIServiceTier(raw string) *string {
 	default:
 		return nil
 	}
+}
+
+// preferResponseServiceTier 返回计费应采用的 service_tier：优先使用上游响应实际
+// 采用的档位（权威值），响应未提供合法档位时才回退到请求体里的值。
+// 计费不能只信任客户端请求的 service_tier，否则客户端可自行发送 "service_tier":"flex"
+// 获得 0.5x 折扣（见 serviceTierCostMultiplier），而上游未必真的按 flex 档位服务/计价。
+func preferResponseServiceTier(responseTier string, requestTier *string) *string {
+	if normalized := normalizeOpenAIServiceTier(responseTier); normalized != nil {
+		return normalized
+	}
+	return requestTier
 }
 
 // OpenAIFastBlockedError indicates a request was rejected by the OpenAI fast

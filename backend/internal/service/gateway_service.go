@@ -8579,25 +8579,29 @@ func (s *GatewayService) handleStreamingResponse(ctx context.Context, resp *http
 				}
 
 				for _, block := range outputBlocks {
-					if !clientDisconnected {
-						restored := reverseToolNamesIfPresent(c, []byte(block))
-						if _, werr := fmt.Fprint(w, string(restored)); werr != nil {
-							clientDisconnected = true
-							logger.LegacyPrintf("service.gateway", "Client disconnected during streaming, continuing to drain upstream for billing")
-							break
-						}
-						flusher.Flush()
-						lastDataAt = time.Now()
-						resetKeepaliveTimer()
+					if clientDisconnected {
+						break
 					}
-					if data != "" {
-						if firstTokenMs == nil && data != "[DONE]" {
-							ms := int(time.Since(startTime).Milliseconds())
-							firstTokenMs = &ms
-						}
-						if usagePatch != nil {
-							mergeSSEUsagePatch(usage, usagePatch)
-						}
+					restored := reverseToolNamesIfPresent(c, []byte(block))
+					if _, werr := fmt.Fprint(w, string(restored)); werr != nil {
+						clientDisconnected = true
+						logger.LegacyPrintf("service.gateway", "Client disconnected during streaming, continuing to drain upstream for billing")
+						break
+					}
+					flusher.Flush()
+					lastDataAt = time.Now()
+					resetKeepaliveTimer()
+				}
+				// usage/首 token 记录必须独立于客户端写入：即使客户端已断开或写入失败，
+				// 也要合并本事件的 usage patch，否则 message_delta 携带的最终 output_tokens
+				// 会在断连那一刻丢失。mergeSSEUsagePatch 为覆盖语义，每事件合并一次即可。
+				if data != "" {
+					if firstTokenMs == nil && data != "[DONE]" {
+						ms := int(time.Since(startTime).Milliseconds())
+						firstTokenMs = &ms
+					}
+					if usagePatch != nil {
+						mergeSSEUsagePatch(usage, usagePatch)
 					}
 				}
 				continue
@@ -9700,6 +9704,9 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 	}, s.billingDeps(), s.usageBillingRepo)
 
 	if billingErr != nil {
+		// 即使计费事务失败，也要留下 usage_log 审计行，避免"请求已服务却无任何记录"。
+		// usage_log 按 request_id 去重（ON CONFLICT），重复写入幂等安全。
+		writeUsageLogBestEffort(ctx, s.usageLogRepo, usageLog, "service.gateway")
 		return billingErr
 	}
 	writeUsageLogBestEffort(ctx, s.usageLogRepo, usageLog, "service.gateway")

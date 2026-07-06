@@ -2778,7 +2778,10 @@ func convertGeminiToClaudeMessage(geminiResp map[string]any, originalModel strin
 
 func extractGeminiUsage(data []byte) *ClaudeUsage {
 	usage := gjson.GetBytes(data, "usageMetadata")
-	if !usage.Exists() {
+	// gjson 对 JSON null 的 Exists() 返回 true，需额外要求它是对象，
+	// 否则末尾一个 "usageMetadata": null 的分块会被解析成全零 usage，
+	// 覆盖掉之前分块已收集的 token 计数（见流式覆盖写逻辑）。
+	if !usage.Exists() || !usage.IsObject() {
 		return nil
 	}
 	prompt := int(usage.Get("promptTokenCount").Int())
@@ -2800,9 +2803,14 @@ func extractGeminiUsage(data []byte) *ClaudeUsage {
 	}
 
 	// 注意：Gemini 的 promptTokenCount 包含 cachedContentTokenCount，
-	// 但 Claude 的 input_tokens 不包含 cache_read_input_tokens，需要减去
+	// 但 Claude 的 input_tokens 不包含 cache_read_input_tokens，需要减去。
+	// 钳制到 >= 0：若上游异常返回 cached > prompt，负值会产生负的 InputCost 冲抵账单。
+	inputTokens := prompt - cached
+	if inputTokens < 0 {
+		inputTokens = 0
+	}
 	return &ClaudeUsage{
-		InputTokens:          prompt - cached,
+		InputTokens:          inputTokens,
 		OutputTokens:         cand + thoughts,
 		CacheReadInputTokens: cached,
 		ImageOutputTokens:    imageTokens,

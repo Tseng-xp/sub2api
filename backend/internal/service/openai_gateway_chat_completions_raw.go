@@ -312,6 +312,7 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 	scanner.Buffer(make([]byte, 0, 64*1024), maxLineSize)
 
 	var usage OpenAIUsage
+	var respServiceTier string
 	var firstTokenMs *int
 	clientDisconnected := false
 	clientOutputStarted := false
@@ -359,6 +360,9 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 				usageOnlyChunk := isOpenAIChatUsageOnlyStreamChunk(payload)
 				if u := extractCCStreamUsage(payload); u != nil {
 					usage = *u
+				}
+				if st := gjson.Get(payload, "service_tier").String(); st != "" {
+					respServiceTier = st
 				}
 				if firstTokenMs == nil && !usageOnlyChunk {
 					elapsed := int(time.Since(startTime).Milliseconds())
@@ -416,7 +420,7 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 		BillingModel:    billingModel,
 		UpstreamModel:   upstreamModel,
 		ReasoningEffort: reasoningEffort,
-		ServiceTier:     serviceTier,
+		ServiceTier:     preferResponseServiceTier(respServiceTier, serviceTier),
 		Stream:          true,
 		Duration:        time.Since(startTime),
 		FirstTokenMs:    firstTokenMs,
@@ -485,13 +489,17 @@ func (s *OpenAIGatewayService) bufferRawChatCompletions(
 
 	var ccResp apicompat.ChatCompletionsResponse
 	var usage OpenAIUsage
-	if err := json.Unmarshal(respBody, &ccResp); err == nil && ccResp.Usage != nil {
-		usage = OpenAIUsage{
-			InputTokens:  ccResp.Usage.PromptTokens,
-			OutputTokens: ccResp.Usage.CompletionTokens,
-		}
-		if ccResp.Usage.PromptTokensDetails != nil {
-			usage.CacheReadInputTokens = ccResp.Usage.PromptTokensDetails.CachedTokens
+	var respServiceTier string
+	if err := json.Unmarshal(respBody, &ccResp); err == nil {
+		respServiceTier = ccResp.ServiceTier
+		if ccResp.Usage != nil {
+			usage = OpenAIUsage{
+				InputTokens:  ccResp.Usage.PromptTokens,
+				OutputTokens: ccResp.Usage.CompletionTokens,
+			}
+			if ccResp.Usage.PromptTokensDetails != nil {
+				usage.CacheReadInputTokens = ccResp.Usage.PromptTokensDetails.CachedTokens
+			}
 		}
 	}
 
@@ -513,7 +521,7 @@ func (s *OpenAIGatewayService) bufferRawChatCompletions(
 		BillingModel:    billingModel,
 		UpstreamModel:   upstreamModel,
 		ReasoningEffort: reasoningEffort,
-		ServiceTier:     serviceTier,
+		ServiceTier:     preferResponseServiceTier(respServiceTier, serviceTier),
 		Stream:          false,
 		Duration:        time.Since(startTime),
 	}, nil

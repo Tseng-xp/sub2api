@@ -4112,7 +4112,9 @@ func (s *AntigravityGatewayService) handleClaudeStreamingResponse(c *gin.Context
 				if errors.Is(ev.err, bufio.ErrTooLong) {
 					logger.LegacyPrintf("service.antigravity_gateway", "SSE line too long (antigravity): max_size=%d error=%v", maxLineSize, ev.err)
 					sendErrorEvent("response_too_large")
-					return &antigravityStreamResult{usage: convertUsage(nil), firstTokenMs: firstTokenMs}, ev.err
+					// 与上面 handleStreamReadError 分支一致：回收处理器已累积的 token，
+					// 不要用 convertUsage(nil) 把超长行之前流出的用量清零。
+					return &antigravityStreamResult{usage: finishUsage(), firstTokenMs: firstTokenMs}, ev.err
 				}
 				sendErrorEvent("stream_read_error")
 				return nil, fmt.Errorf("stream read error: %w", ev.err)
@@ -4578,10 +4580,12 @@ func (s *AntigravityGatewayService) streamUpstreamResponse(c *gin.Context, resp 
 // 仅读取顶层 event.usage 会漏掉 message_start 的输入侧字段，导致流式透传请求落库的
 // usage_logs 记录 input_tokens=0。
 func (s *AntigravityGatewayService) extractSSEUsage(line string, usage *ClaudeUsage) {
-	if !strings.HasPrefix(line, "data: ") {
+	// SSE 规范允许 data 后不带空格（data:{...}），需同时兼容 "data:" 与 "data: "，
+	// 否则无空格的上游会正常转发给客户端却记录零用量。
+	if !strings.HasPrefix(line, "data:") {
 		return
 	}
-	dataStr := strings.TrimPrefix(line, "data: ")
+	dataStr := strings.TrimLeft(strings.TrimPrefix(line, "data:"), " \t")
 	var event map[string]any
 	if json.Unmarshal([]byte(dataStr), &event) != nil {
 		return

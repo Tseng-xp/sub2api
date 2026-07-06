@@ -682,16 +682,11 @@ func TestExtractGeminiUsage(t *testing.T) {
 			wantNil: true,
 		},
 		{
-			// gjson 对 null 返回 Exists()=true，因此函数不会返回 nil，
-			// 而是返回全零的 ClaudeUsage。
-			name:    "null usageMetadata — gjson Exists 为 true",
+			// gjson 对 null 返回 Exists()=true，但额外的 IsObject() 校验会拒绝它，
+			// 返回 nil，避免末尾 null 分块把之前收集的用量覆盖清零。
+			name:    "null usageMetadata — 应返回 nil",
 			input:   `{"usageMetadata":null}`,
-			wantNil: false,
-			wantUsage: &ClaudeUsage{
-				InputTokens:          0,
-				OutputTokens:         0,
-				CacheReadInputTokens: 0,
-			},
+			wantNil: true,
 		},
 		{
 			name:    "零值字段",

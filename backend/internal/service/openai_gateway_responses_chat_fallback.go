@@ -16,6 +16,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/gin-gonic/gin"
+	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
 )
 
@@ -246,7 +247,7 @@ func (s *OpenAIGatewayService) bufferChatCompletionsAsResponses(
 		BillingModel:    billingModel,
 		UpstreamModel:   upstreamModel,
 		ReasoningEffort: reasoningEffort,
-		ServiceTier:     serviceTier,
+		ServiceTier:     preferResponseServiceTier(usage.ServiceTier, serviceTier),
 		Stream:          false,
 		Duration:        time.Since(startTime),
 	}, nil
@@ -281,6 +282,7 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsResponses(
 
 	state := apicompat.NewChatCompletionsToResponsesStreamState(originalModel)
 	var usage OpenAIUsage
+	var respServiceTier string
 	var firstTokenMs *int
 	clientDisconnected := false
 	sawDone := false
@@ -336,6 +338,9 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsResponses(
 		if u := extractCCStreamUsage(payload); u != nil {
 			usage = *u
 		}
+		if st := gjson.Get(payload, "service_tier").String(); st != "" {
+			respServiceTier = st
+		}
 
 		var chunk apicompat.ChatCompletionsChunk
 		if err := json.Unmarshal([]byte(payload), &chunk); err != nil {
@@ -366,7 +371,7 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsResponses(
 			BillingModel:    billingModel,
 			UpstreamModel:   upstreamModel,
 			ReasoningEffort: reasoningEffort,
-			ServiceTier:     serviceTier,
+			ServiceTier:     preferResponseServiceTier(respServiceTier, serviceTier),
 			Stream:          true,
 			Duration:        time.Since(startTime),
 			FirstTokenMs:    firstTokenMs,
@@ -396,7 +401,7 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsResponses(
 		BillingModel:    billingModel,
 		UpstreamModel:   upstreamModel,
 		ReasoningEffort: reasoningEffort,
-		ServiceTier:     serviceTier,
+		ServiceTier:     preferResponseServiceTier(respServiceTier, serviceTier),
 		Stream:          true,
 		Duration:        time.Since(startTime),
 		FirstTokenMs:    firstTokenMs,

@@ -987,6 +987,13 @@ func (s *BillingService) calculatePerRequestCost(resolved *ResolvedPricing, inpu
 		unitPrice = resolved.DefaultPerRequestPrice
 	}
 
+	// 按次/图片模式下单价为 0 通常意味着渠道漏配了每次价格/层级价格，会静默产生免费请求。
+	// 打一条 warn 让运营可见（不改变金额，避免误伤确实免费的模型）。
+	if unitPrice == 0 {
+		log.Printf("[Billing] per-request unit price resolved to 0 (possible missing config) model=%s tier=%s mode=%s",
+			input.Model, input.SizeTier, resolved.Mode)
+	}
+
 	totalCost := unitPrice * float64(count)
 	actualCost := totalCost * input.RateMultiplier
 

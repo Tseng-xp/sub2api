@@ -917,7 +917,7 @@ func TestOpenAIGatewayServiceRecordUsage_GeneratesRequestIDWhenAllSourcesMissing
 	require.Equal(t, billingRepo.lastCmd.RequestID, usageRepo.lastLog.RequestID)
 }
 
-func TestOpenAIGatewayServiceRecordUsage_BillingErrorSkipsUsageLogWrite(t *testing.T) {
+func TestOpenAIGatewayServiceRecordUsage_BillingErrorStillWritesUsageLog(t *testing.T) {
 	usageRepo := &openAIRecordUsageLogRepoStub{}
 	billingRepo := &openAIRecordUsageBillingRepoStub{err: errors.New("billing tx failed")}
 	userRepo := &openAIRecordUsageUserRepoStub{}
@@ -941,7 +941,8 @@ func TestOpenAIGatewayServiceRecordUsage_BillingErrorSkipsUsageLogWrite(t *testi
 
 	require.Error(t, err)
 	require.Equal(t, 1, billingRepo.calls)
-	require.Equal(t, 0, usageRepo.calls)
+	// 计费失败也应写审计日志（幂等），便于对账"已服务未计费"的请求。
+	require.Equal(t, 1, usageRepo.calls)
 }
 
 func TestOpenAIGatewayServiceRecordUsage_UpdatesAPIKeyQuotaWhenConfigured(t *testing.T) {

@@ -107,8 +107,19 @@ func (r *usageBillingRepository) claimUsageBillingKey(ctx context.Context, tx *s
 
 func (r *usageBillingRepository) applyUsageBillingEffects(ctx context.Context, tx *sql.Tx, cmd *service.UsageBillingCommand, result *service.UsageBillingApplyResult) error {
 	if cmd.SubscriptionCost > 0 && cmd.SubscriptionID != nil {
-		if err := incrementUsageBillingSubscription(ctx, tx, *cmd.SubscriptionID, cmd.SubscriptionCost); err != nil {
+		applied, err := incrementUsageBillingSubscription(ctx, tx, *cmd.SubscriptionID, cmd.SubscriptionCost)
+		if err != nil {
 			return err
+		}
+		if !applied {
+			// 订阅已过期/失效（status 非 active 或已过 expires_at）：回退到扣用户余额，
+			// 避免这段用量既不计订阅也不扣余额而变成免费（预检查读的是缓存，存在过期窗口）。
+			newBalance, sufficient, err := deductUsageBillingBalance(ctx, tx, cmd.UserID, cmd.SubscriptionCost)
+			if err != nil {
+				return err
+			}
+			result.NewBalance = &newBalance
+			result.BalanceOverdrafted = !sufficient
 		}
 	}
 
@@ -146,7 +157,10 @@ func (r *usageBillingRepository) applyUsageBillingEffects(ctx context.Context, t
 	return nil
 }
 
-func incrementUsageBillingSubscription(ctx context.Context, tx *sql.Tx, subscriptionID int64, costUSD float64) error {
+// incrementUsageBillingSubscription 递增订阅用量。仅当订阅处于 active 且未过期时生效。
+// 返回 applied=false 表示订阅不存在/已删除/非 active/已过期——调用方据此回退到余额扣费，
+// 避免过期窗口内的用量变成免费。
+func incrementUsageBillingSubscription(ctx context.Context, tx *sql.Tx, subscriptionID int64, costUSD float64) (bool, error) {
 	const updateSQL = `
 		UPDATE user_subscriptions us
 		SET
@@ -157,21 +171,20 @@ func incrementUsageBillingSubscription(ctx context.Context, tx *sql.Tx, subscrip
 		FROM groups g
 		WHERE us.id = $2
 			AND us.deleted_at IS NULL
+			AND us.status = $3
+			AND us.expires_at > NOW()
 			AND us.group_id = g.id
 			AND g.deleted_at IS NULL
 	`
-	res, err := tx.ExecContext(ctx, updateSQL, costUSD, subscriptionID)
+	res, err := tx.ExecContext(ctx, updateSQL, costUSD, subscriptionID, service.SubscriptionStatusActive)
 	if err != nil {
-		return err
+		return false, err
 	}
 	affected, err := res.RowsAffected()
 	if err != nil {
-		return err
+		return false, err
 	}
-	if affected > 0 {
-		return nil
-	}
-	return service.ErrSubscriptionNotFound
+	return affected > 0, nil
 }
 
 func deductUsageBillingBalance(ctx context.Context, tx *sql.Tx, userID int64, amount float64) (float64, bool, error) {
