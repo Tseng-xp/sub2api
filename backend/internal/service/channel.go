@@ -91,8 +91,8 @@ type ChannelModelPricing struct {
 
 // PricingInterval 定价区间（token 区间 / 按次分层 / 图片分辨率分层）
 type PricingInterval struct {
-	ID              int64
-	PricingID       int64
+	ID        int64
+	PricingID int64
 	// 匹配语义为左开右闭 (MinTokens, MaxTokens]，见 FindMatchingInterval 与 TestGetIntervalForContext。
 	MinTokens       int      // 区间下界（不含，左开）——例如 MinTokens=0 时 0 token 不落入本区间
 	MaxTokens       *int     // 区间上界（含，右闭），nil = 无上限
