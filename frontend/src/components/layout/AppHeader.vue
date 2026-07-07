@@ -65,7 +65,7 @@
             />
           </svg>
           <span class="text-sm font-semibold text-primary-700 dark:text-primary-300">
-            {{ currencyStore.formatAmount(user.balance) }}
+            {{ formatHeaderBalance(user.balance) }}
           </span>
         </div>
 
@@ -113,7 +113,7 @@
                   {{ t('common.balance') }}
                 </div>
                 <div class="text-sm font-semibold text-primary-600 dark:text-primary-400">
-                  {{ currencyStore.formatAmount(user.balance) }}
+                  {{ formatHeaderBalance(user.balance) }}
                 </div>
               </div>
 
@@ -235,6 +235,16 @@ const authStore = useAuthStore()
 const adminSettingsStore = useAdminSettingsStore()
 const onboardingStore = useOnboardingStore()
 const currencyStore = useCurrencyStore()
+
+// 顶栏余额专用：按展示币种换算 + 对应符号 + 千分位，固定 2 位小数。
+// 仅用于顶栏，不改共享的 currencyStore.formatAmount（其它页面显示规则不变）。
+function formatHeaderBalance(value: number | null | undefined): string {
+  const amount = currencyStore.convertAmount(value ?? 0)
+  return `${currencyStore.currencySymbol}${amount.toLocaleString('zh-CN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`
+}
 
 const user = computed(() => authStore.user)
 const dropdownOpen = ref(false)

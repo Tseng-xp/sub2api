@@ -186,6 +186,7 @@ import Icon from '@/components/icons/Icon.vue'
 import ProfileAvatarCard from '@/components/user/profile/ProfileAvatarCard.vue'
 import ProfileEditForm from '@/components/user/profile/ProfileEditForm.vue'
 import ProfileIdentityBindingsSection from '@/components/user/profile/ProfileIdentityBindingsSection.vue'
+import { useCurrencyStore } from '@/stores/currency'
 import type { User, UserAuthBindingStatus, UserAuthProvider, UserProfileSourceContext } from '@/types'
 
 const props = withDefaults(defineProps<{
@@ -208,6 +209,7 @@ const props = withDefaults(defineProps<{
 })
 
 const { t } = useI18n()
+const currencyStore = useCurrencyStore()
 
 function normalizeBindingStatus(binding: boolean | UserAuthBindingStatus | undefined): boolean | null {
   if (typeof binding === 'boolean') {
@@ -273,7 +275,8 @@ const providerLabels = computed<Record<UserAuthProvider, string>>(() => ({
 }))
 
 function formatCurrency(value: number): string {
-  return `$${value.toFixed(2)}`
+  // 按管理员设定的展示币种换算并显示对应符号（USD 不变；CNY 乘汇率、显示 ¥）
+  return `${currencyStore.currencySymbol}${currencyStore.convertAmount(value).toFixed(2)}`
 }
 
 function normalizeProvider(value: string): UserAuthProvider | null {
