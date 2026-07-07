@@ -22,6 +22,13 @@ vi.mock('@/stores/app', () => ({
   })
 }))
 
+vi.mock('@/stores/currency', () => ({
+  useCurrencyStore: () => ({
+    convertAmount: (value: number) => value,
+    currencySymbol: '$'
+  })
+}))
+
 vi.mock('vue-i18n', async (importOriginal) => {
   const actual = await importOriginal<typeof import('vue-i18n')>()
   return {
