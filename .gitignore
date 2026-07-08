@@ -60,8 +60,10 @@ docker-compose.override.yml
 # 本地部署凭据（服务器 IP / root 密码等，绝不入库）
 deploy.local.env
 .deploy.env
+servers.local.env
 *.secret
 secrets.local.*
+*.pem
 
 # ===================
 # IDE / 编辑器
