@@ -9665,6 +9665,10 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 	if input.BillingModelSource == BillingModelSourceRequested && input.OriginalModel != "" {
 		billingModel = input.OriginalModel
 	}
+	// 优先选用命中渠道定价的候选模型名，避免映射别名先命中兜底价导致渠道价不生效
+	// （与 OpenAI 网关 calculateOpenAIRecordUsageCost 的候选优先逻辑一致）。
+	billingModel = s.preferChannelPricedBillingModel(ctx, apiKey, billingModel,
+		input.OriginalModel, result.Model, result.UpstreamModel, input.ChannelMappedModel)
 
 	// 确定 RequestedModel（渠道映射前的原始模型）
 	requestedModel := result.Model
@@ -9763,6 +9767,28 @@ func (s *GatewayService) calculateRecordUsageCost(
 
 	// Token 计费
 	return s.calculateTokenCost(ctx, result, apiKey, billingModel, multiplier, opts)
+}
+
+// preferChannelPricedBillingModel 在多个候选模型名中优先选用命中管理员渠道定价的那个。
+// 背景：账号映射 / BillingModelSource=upstream 会把计费模型名改成别名（如上游名），
+// 该别名可能未配渠道价却命中硬编码兜底价，导致原始请求名（配了渠道价，如 glm-5.1）永远不被尝试，
+// 从而按兜底价错误计费。与 OpenAI 网关的候选优先策略保持一致。
+// primary 若已命中渠道价则原样返回（行为不变）；仅当 primary 无渠道价、而某个候选有时才切换；
+// 全部候选都无渠道价时仍返回 primary（回退逻辑与原来完全一致，零风险）。
+func (s *GatewayService) preferChannelPricedBillingModel(ctx context.Context, apiKey *APIKey, primary string, alternates ...string) string {
+	if s.resolveChannelPricing(ctx, primary, apiKey) != nil {
+		return primary
+	}
+	for _, cand := range alternates {
+		cand = strings.TrimSpace(cand)
+		if cand == "" || cand == primary {
+			continue
+		}
+		if s.resolveChannelPricing(ctx, cand, apiKey) != nil {
+			return cand
+		}
+	}
+	return primary
 }
 
 // resolveChannelPricing 检查指定模型是否存在渠道级别定价。
