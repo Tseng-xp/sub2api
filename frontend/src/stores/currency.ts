@@ -50,7 +50,10 @@ export const useCurrencyStore = defineStore('currency', () => {
   })
 
   const currencySymbol = computed(() => {
-    return effectiveCurrency.value === 'USD' ? '$' : '¥'
+    // CNY 但汇率未配置(<=0)时无法换算，符号回退到 $，与 convertAmount/formatAmount 保持一致，
+    // 避免出现"¥ + 未换算的美元数字"这种错误标注。
+    if (effectiveCurrency.value === 'CNY' && exchangeRate.value > 0) return '¥'
+    return '$'
   })
 
   const currencyCode = computed(() => effectiveCurrency.value)
