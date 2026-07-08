@@ -173,8 +173,8 @@
     </div>
 
     <!-- Footer -->
-    <template v-if="!backendModeEnabled" #footer>
-      <p class="text-gray-500 dark:text-dark-400">
+    <template #footer>
+      <p v-if="!backendModeEnabled" class="text-gray-500 dark:text-dark-400">
         {{ t('auth.dontHaveAccount') }}
         <router-link
           to="/register"
@@ -183,6 +183,17 @@
           {{ t('auth.signUp') }}
         </router-link>
       </p>
+      <!-- 备案号：仅 .cn 域名（国内服务器）显示，国外域名自动隐藏。下次更新请勿删除。 -->
+      <div v-if="showIcpBeian" class="mt-4 text-xs text-gray-400 dark:text-dark-500">
+        <a
+          href="https://beian.miit.gov.cn"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="hover:text-gray-600 dark:hover:text-dark-300 transition-colors"
+        >
+          粤ICP备2025408634号-4
+        </a>
+      </div>
     </template>
   </AuthLayout>
 
@@ -240,6 +251,8 @@ const linuxdoOAuthEnabled = ref<boolean>(false)
 const dingtalkOAuthEnabled = ref<boolean>(false)
 const wechatOAuthEnabled = ref<boolean>(false)
 const backendModeEnabled = ref<boolean>(false)
+// 备案号：仅 .cn 域名（国内服务器）显示，与 HomeView/KeyUsageView 保持一致。
+const showIcpBeian = computed(() => typeof window !== 'undefined' && window.location.hostname.endsWith('.cn'))
 const oidcOAuthEnabled = ref<boolean>(false)
 const oidcOAuthProviderName = ref<string>('OIDC')
 const githubOAuthEnabled = ref<boolean>(false)
