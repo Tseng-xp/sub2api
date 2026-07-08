@@ -405,7 +405,7 @@
             class="text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-dark-400 dark:hover:text-white"
           >{{ t('home.docs') }}</a>
         </div>
-        <div class="mt-4 text-center text-xs text-gray-400 dark:text-dark-500">
+        <div v-if="showIcpBeian" class="mt-4 text-center text-xs text-gray-400 dark:text-dark-500">
           <a href="https://beian.miit.gov.cn" target="_blank" rel="noopener noreferrer" class="hover:text-gray-600 dark:hover:text-dark-300 transition-colors">
             粤ICP备2025408634号-4
           </a>
@@ -431,6 +431,8 @@ const currencyStore = useCurrencyStore()
 
 // ==================== Site Settings (same as HomeView) ====================
 
+// 备案号仅在中国大陆(.cn)域名显示：国内服务器要备案，国外(.com)不需要。
+const showIcpBeian = computed(() => typeof window !== 'undefined' && window.location.hostname.endsWith('.cn'))
 const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || 'Sub2API')
 const siteLogo = computed(() => appStore.cachedPublicSettings?.site_logo || appStore.siteLogo || '')
 const docUrl = computed(() => appStore.cachedPublicSettings?.doc_url || appStore.docUrl || '')
