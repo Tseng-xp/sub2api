@@ -97,6 +97,41 @@ func TestGetIntervalPricing_MatchesInterval(t *testing.T) {
 	require.InDelta(t, 3e-6, result2.InputPricePerToken, 1e-12)
 }
 
+// 区间只覆盖显式配置的价格字段，未配字段必须从 BasePricing 继承，
+// 否则漏配 cache_read/cache_write 会使这些成本被按 0 免费计费（漏收）。
+func TestGetIntervalPricing_InheritsBaseForUnspecifiedFields(t *testing.T) {
+	bs := newTestBillingServiceForResolver()
+	r := NewModelPricingResolver(&ChannelService{}, bs)
+
+	base := &ModelPricing{
+		InputPricePerToken:         5e-6,
+		OutputPricePerToken:        10e-6,
+		CacheReadPricePerToken:     1e-6,
+		CacheCreationPricePerToken: 6e-6,
+	}
+	resolved := &ResolvedPricing{
+		Mode:                   BillingModeToken,
+		BasePricing:            base,
+		SupportsCacheBreakdown: true,
+		Intervals: []PricingInterval{
+			// 只配 input/output，故意不配 cache_read / cache_write
+			{MinTokens: 0, MaxTokens: testPtrInt(128000), InputPrice: testPtrFloat64(1e-6), OutputPrice: testPtrFloat64(2e-6)},
+		},
+	}
+
+	result := r.GetIntervalPricing(resolved, 50000)
+	require.NotNil(t, result)
+	// 显式覆盖的字段用区间值
+	require.InDelta(t, 1e-6, result.InputPricePerToken, 1e-12)
+	require.InDelta(t, 2e-6, result.OutputPricePerToken, 1e-12)
+	// 未配字段继承基础价，而不是被归零
+	require.InDelta(t, 1e-6, result.CacheReadPricePerToken, 1e-12, "未配的 cache_read 应继承基础价")
+	require.InDelta(t, 6e-6, result.CacheCreationPricePerToken, 1e-12, "未配的 cache_write 应继承基础价")
+	// 不能污染共享的 BasePricing
+	require.InDelta(t, 5e-6, resolved.BasePricing.InputPricePerToken, 1e-12, "BasePricing 不应被区间覆盖污染")
+	require.InDelta(t, 1e-6, resolved.BasePricing.CacheReadPricePerToken, 1e-12)
+}
+
 func TestGetIntervalPricing_NoMatch_FallsBackToBase(t *testing.T) {
 	bs := newTestBillingServiceForResolver()
 	r := NewModelPricingResolver(&ChannelService{}, bs)

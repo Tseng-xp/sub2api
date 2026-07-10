@@ -940,7 +940,9 @@ func TestOpenAIGatewayServiceRecordUsage_BillingErrorStillWritesUsageLog(t *test
 	})
 
 	require.Error(t, err)
-	require.Equal(t, 1, billingRepo.calls)
+	// 瞬时性计费错误会有界重试（applyUsageBillingWithRetry，最多 3 次），抵御 DB 抖动导致的漏计费；
+	// 非终态错误（此处为通用 "billing tx failed"）会重试到上限。Apply 幂等去重，重试不会重复扣费。
+	require.Equal(t, 3, billingRepo.calls)
 	// 计费失败也应写审计日志（幂等），便于对账"已服务未计费"的请求。
 	require.Equal(t, 1, usageRepo.calls)
 }

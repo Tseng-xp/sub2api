@@ -9263,6 +9263,44 @@ func buildUsageBillingCommand(requestID string, usageLog *UsageLog, p *postUsage
 	return cmd
 }
 
+// isTerminalUsageBillingError 判断计费错误是否为"终态业务错误"——重试无意义、也不应重试的错误。
+// 去重指纹冲突 / 缺 request_id / 用户不存在都是确定性结果，重试只会得到同样结果。
+// context 取消/超时也不再重试（无更多可用时间）。其余错误（DB 连接抖动、序列化失败、死锁等瞬时错误）可重试。
+func isTerminalUsageBillingError(err error) bool {
+	return err == nil ||
+		errors.Is(err, ErrUsageBillingRequestConflict) ||
+		errors.Is(err, ErrUsageBillingRequestIDRequired) ||
+		errors.Is(err, ErrUserNotFound) ||
+		errors.Is(err, context.Canceled) ||
+		errors.Is(err, context.DeadlineExceeded)
+}
+
+// applyUsageBillingWithRetry 对计费事务做有界重试，抵御瞬时 DB 错误（连接抖动 / 序列化失败 / 死锁），
+// 减少"请求已服务但因 DB 瞬时错误而漏计费"的漏收。
+// 安全性：repo.Apply 通过 (request_id, api_key_id) 去重且幂等——若首次其实已提交但返回前连接中断，
+// 重试会命中 ON CONFLICT 并返回 Applied=false，绝不会重复扣费。终态业务错误不重试。
+func applyUsageBillingWithRetry(ctx context.Context, repo UsageBillingRepository, cmd *UsageBillingCommand) (*UsageBillingApplyResult, error) {
+	const maxAttempts = 3
+	var lastErr error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		result, err := repo.Apply(ctx, cmd)
+		if err == nil {
+			return result, nil
+		}
+		lastErr = err
+		if isTerminalUsageBillingError(err) || attempt == maxAttempts {
+			return nil, err
+		}
+		// 有界退避（100ms、200ms），尊重 context 取消
+		select {
+		case <-ctx.Done():
+			return nil, lastErr
+		case <-time.After(time.Duration(attempt) * 100 * time.Millisecond):
+		}
+	}
+	return nil, lastErr
+}
+
 func applyUsageBilling(ctx context.Context, requestID string, usageLog *UsageLog, p *postUsageBillingParams, deps *billingDeps, repo UsageBillingRepository) (bool, error) {
 	if p == nil || deps == nil {
 		return false, nil
@@ -9277,7 +9315,7 @@ func applyUsageBilling(ctx context.Context, requestID string, usageLog *UsageLog
 	billingCtx, cancel := detachedBillingContext(ctx)
 	defer cancel()
 
-	result, err := repo.Apply(billingCtx, cmd)
+	result, err := applyUsageBillingWithRetry(billingCtx, repo, cmd)
 	if err != nil {
 		return false, err
 	}

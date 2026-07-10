@@ -225,14 +225,21 @@ func (r *ModelPricingResolver) GetIntervalPricing(resolved *ResolvedPricing, tot
 		return resolved.BasePricing
 	}
 
-	return intervalToModelPricing(iv, resolved.SupportsCacheBreakdown, resolved.channelPricing)
+	return intervalToModelPricing(iv, resolved.BasePricing, resolved.SupportsCacheBreakdown, resolved.channelPricing)
 }
 
-// intervalToModelPricing 将区间定价转换为 ModelPricing
-func intervalToModelPricing(iv *PricingInterval, supportsCacheBreakdown bool, chPricing *ChannelModelPricing) *ModelPricing {
-	pricing := &ModelPricing{
-		SupportsCacheBreakdown: supportsCacheBreakdown,
+// intervalToModelPricing 将区间定价转换为 ModelPricing。
+// 区间只覆盖显式配置的价格字段，其余字段从 base(BasePricing) 继承——与扁平渠道覆盖
+// applyTokenOverrides 的语义一致（"覆盖 BasePricing 中的对应字段"）。若不继承而从空结构体开始，
+// 区间漏配某项价格（如 cache_read/output/cache_write）会使该成本被按 0 免费计费，造成漏收。
+// ModelPricing 全部为标量字段，浅拷贝即完整拷贝，且下方只覆盖标量字段，不会污染共享的 base。
+func intervalToModelPricing(iv *PricingInterval, base *ModelPricing, supportsCacheBreakdown bool, chPricing *ChannelModelPricing) *ModelPricing {
+	pricing := &ModelPricing{}
+	if base != nil {
+		clone := *base
+		pricing = &clone
 	}
+	pricing.SupportsCacheBreakdown = supportsCacheBreakdown
 	if iv.InputPrice != nil {
 		pricing.InputPricePerToken = *iv.InputPrice
 		pricing.InputPricePerTokenPriority = *iv.InputPrice
