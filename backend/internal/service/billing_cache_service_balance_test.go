@@ -52,6 +52,20 @@ func TestCheckBillingEligibility_RejectsBalanceBelowMinimumReserve(t *testing.T)
 	require.ErrorIs(t, err, ErrInsufficientBalance)
 }
 
+// 缓存陈旧显示余额不足、但 DB 实际充足时，应回源 DB 复核并放行，不误拒（修复"有余额却被拒"）。
+func TestCheckBillingEligibility_ReChecksDBAndAllowsWhenCacheStaleLow(t *testing.T) {
+	cache := &balanceEligibilityCacheStub{balance: 0.005} // 缓存陈旧：显示不足
+	userRepo := &balanceLoadUserRepoStub{balance: 10.0}   // DB 真实余额：充足
+	cfg := &config.Config{}
+	cfg.Billing.MinimumBalanceReserve = 0.01
+	svc := NewBillingCacheService(cache, userRepo, nil, nil, nil, nil, cfg, nil)
+	t.Cleanup(svc.Stop)
+
+	err := svc.CheckBillingEligibility(context.Background(), &User{ID: 1}, nil, nil, nil, "")
+	require.NoError(t, err)                    // DB 复核充足 → 放行，不误拒
+	require.Positive(t, userRepo.calls.Load()) // 确实回源了 DB
+}
+
 func TestCheckBillingEligibility_AllowsBalanceAtMinimumReserve(t *testing.T) {
 	cache := &balanceEligibilityCacheStub{balance: 0.01}
 	cfg := &config.Config{}
@@ -88,7 +102,9 @@ func TestSyncBalanceCacheAfterDeduction_InvalidatesExhaustedBalance(t *testing.T
 
 	err := svc.CheckBillingEligibility(context.Background(), &User{ID: 1}, nil, nil, nil, "")
 	require.ErrorIs(t, err, ErrInsufficientBalance)
-	require.Equal(t, int64(1), userRepo.calls.Load())
+	// 缓存未命中先回源 DB 一次(得 -0.25)，判定不足后新增的"拒绝前 DB 复核"再读一次确认，
+	// 故 2 次；两次都是负余额，仍正确拒绝(避免缓存漂移误拒)。
+	require.Equal(t, int64(2), userRepo.calls.Load())
 }
 
 func TestSyncBalanceCacheAfterDeduction_InvalidatesWhenBalanceFallsBelowReserve(t *testing.T) {

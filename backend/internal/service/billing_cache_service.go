@@ -890,7 +890,26 @@ func (s *BillingCacheService) checkBalanceEligibility(ctx context.Context, userI
 	}
 
 	if s.balanceBelowEligibilityThreshold(balance) {
-		return ErrInsufficientBalance
+		// 缓存显示余额不足时回源 DB 复核，避免缓存陈旧/漂移（并发扣费、失效竞态）导致
+		// "有余额却被拒"的误报。仅在极少数"将要拒绝"的路径多查一次 DB，成本可忽略。
+		// userRepo 不可用时（如单测）回退到按缓存判定，保持原有行为。
+		if s.userRepo == nil {
+			return ErrInsufficientBalance
+		}
+		dbBalance, dbErr := s.getUserBalanceFromDB(ctx, userID)
+		if dbErr != nil {
+			// DB 复核失败：保守维持拒绝，避免放行欠费。
+			return ErrInsufficientBalance
+		}
+		if s.balanceBelowEligibilityThreshold(dbBalance) {
+			return ErrInsufficientBalance
+		}
+		// DB 显示余额充足：说明是缓存误报，刷新缓存为真实值并放行。
+		_ = s.enqueueCacheWrite(cacheWriteTask{
+			kind:    cacheWriteSetBalance,
+			userID:  userID,
+			balance: dbBalance,
+		})
 	}
 
 	return nil
