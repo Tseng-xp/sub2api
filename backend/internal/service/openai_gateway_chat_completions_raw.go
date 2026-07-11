@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/apicompat"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
@@ -267,7 +268,7 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 	var result *OpenAIForwardResult
 	var forwardErr error
 	if clientStream {
-		result, forwardErr = s.streamRawChatCompletions(c, resp, account, originalModel, billingModel, upstreamModel, reasoningEffort, serviceTier, startTime, len(body))
+		result, forwardErr = s.streamRawChatCompletions(c, resp, account, originalModel, billingModel, upstreamModel, reasoningEffort, serviceTier, startTime, body)
 	} else {
 		result, forwardErr = s.bufferRawChatCompletions(c, resp, originalModel, billingModel, upstreamModel, reasoningEffort, serviceTier, startTime)
 	}
@@ -313,7 +314,7 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 	reasoningEffort *string,
 	serviceTier *string,
 	startTime time.Time,
-	requestBodyLen int,
+	requestBody []byte,
 ) (*OpenAIForwardResult, error) {
 	requestID := resp.Header.Get("x-request-id")
 
@@ -343,10 +344,11 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 	var usage OpenAIUsage
 	var respServiceTier string
 	var firstTokenMs *int
+	var outputContent strings.Builder // 累积流式输出内容，用于上游未返回 usage 时本地估算 token
 	clientDisconnected := false
 	clientOutputStarted := false
 	pendingLines := make([]string, 0, 8)
-	refusalDetector := newOpenAIChatSilentRefusalDetector(requestBodyLen)
+	refusalDetector := newOpenAIChatSilentRefusalDetector(len(requestBody))
 
 	writeLine := func(line string) {
 		if clientDisconnected {
@@ -389,6 +391,10 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 				usageOnlyChunk := isOpenAIChatUsageOnlyStreamChunk(payload)
 				if u := extractCCStreamUsage(payload); u != nil {
 					usage = *u
+				}
+				// 累积输出内容，作为上游不返回 usage 时的兜底估算依据
+				if content := gjson.Get(payload, "choices.0.delta.content").String(); content != "" {
+					outputContent.WriteString(content)
 				}
 				if st := gjson.Get(payload, "service_tier").String(); st != "" {
 					respServiceTier = st
@@ -442,6 +448,25 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 		}
 	}
 
+	// 兜底：上游流式未返回 usage 帧（部分中转/供应商即便请求了 include_usage 也不发 usage，
+	// 会导致本网关记 0 token = 免费漏收）。此时用本地估算填补，避免免费。
+	// 仅在完全没有 usage 时启用；一旦上游给了任何 usage 就以上游为准。
+	if usage.InputTokens == 0 && usage.OutputTokens == 0 && usage.CacheReadInputTokens == 0 {
+		estIn := estimateChatInputTokens(requestBody)
+		estOut := estimateTokensFromText(outputContent.String())
+		if estIn > 0 || estOut > 0 {
+			usage.InputTokens = estIn
+			usage.OutputTokens = estOut
+			logger.L().Warn("openai chat_completions raw: 上游流式未返回 usage，改用本地估算计费（防免费漏收）；建议核查上游 include_usage 支持或更换上游",
+				zap.String("request_id", requestID),
+				zap.String("billing_model", billingModel),
+				zap.String("upstream_model", upstreamModel),
+				zap.Int("est_input_tokens", estIn),
+				zap.Int("est_output_tokens", estOut),
+			)
+		}
+	}
+
 	return &OpenAIForwardResult{
 		RequestID:       requestID,
 		Usage:           usage,
@@ -454,6 +479,64 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 		Duration:        time.Since(startTime),
 		FirstTokenMs:    firstTokenMs,
 	}, nil
+}
+
+// estimateTokensFromText 在上游未返回 usage 时对文本做跨语言 token 估算（仅兜底用）。
+// 经验值：ASCII≈4 字符/token；中日韩(CJK)≈0.6 token/字符；其它≈2 字符/token。
+// 目标是"不为 0 且量级合理"，非精确值。
+func estimateTokensFromText(text string) int {
+	if text == "" {
+		return 0
+	}
+	var ascii, cjk, other int
+	for _, r := range text {
+		switch {
+		case r < 128:
+			ascii++
+		case isCJKRune(r):
+			cjk++
+		default:
+			other++
+		}
+	}
+	tokens := ascii/4 + (cjk*3)/5 + other/2
+	if tokens < 1 && (ascii+cjk+other) > 0 {
+		tokens = 1
+	}
+	return tokens
+}
+
+func isCJKRune(r rune) bool {
+	return unicode.Is(unicode.Han, r) || unicode.Is(unicode.Hiragana, r) ||
+		unicode.Is(unicode.Katakana, r) || unicode.Is(unicode.Hangul, r)
+}
+
+// estimateChatInputTokens 从 Chat Completions 请求体的 messages 估算输入 token（仅兜底用）。
+// content 支持字符串或多模态数组（取其中 text 部分）；每条消息加 ~4 token 结构开销。
+func estimateChatInputTokens(body []byte) int {
+	if len(body) == 0 {
+		return 0
+	}
+	total := 0
+	messages := gjson.GetBytes(body, "messages")
+	if !messages.IsArray() {
+		return 0
+	}
+	for _, m := range messages.Array() {
+		content := m.Get("content")
+		switch {
+		case content.Type == gjson.String:
+			total += estimateTokensFromText(content.String())
+		case content.IsArray():
+			for _, part := range content.Array() {
+				if t := part.Get("text"); t.Exists() {
+					total += estimateTokensFromText(t.String())
+				}
+			}
+		}
+		total += 4
+	}
+	return total
 }
 
 // ensureOpenAIChatStreamUsage 确保 raw Chat Completions 流式请求会让上游返回 usage。

@@ -122,6 +122,57 @@ func TestForwardAsRawChatCompletions_ForcesStreamUsageUpstreamAndPassesUsageDown
 	require.Contains(t, rec.Body.String(), "data: [DONE]")
 }
 
+// 模拟部分上游/中转流式即使请求了 include_usage 也不返回 usage 帧、也不发 [DONE] 的情况：
+// 网关必须本地估算 token 计费，而不是记 0 造成免费漏收。
+func TestForwardAsRawChatCompletions_EstimatesUsageWhenUpstreamOmitsStreamUsage(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	body := []byte(`{"model":"deepseek-v4-pro","messages":[{"role":"user","content":"用一句话介绍一下你自己"}],"stream":true}`)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	upstreamBody := strings.Join([]string{
+		`data: {"id":"c1","object":"chat.completion.chunk","model":"deepseek-v4-pro","choices":[{"index":0,"delta":{"content":"你好"}}]}`,
+		"",
+		`data: {"id":"c1","object":"chat.completion.chunk","model":"deepseek-v4-pro","choices":[{"index":0,"delta":{"content":"，很高兴认识你，我是一个 AI 助手"}}]}`,
+		"",
+	}, "\n")
+	upstream := &httpUpstreamRecorder{resp: &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"text/event-stream"}, "x-request-id": []string{"rid_no_usage"}},
+		Body:       io.NopCloser(strings.NewReader(upstreamBody)),
+	}}
+
+	svc := &OpenAIGatewayService{
+		cfg:          rawChatCompletionsTestConfig(),
+		httpUpstream: upstream,
+	}
+	account := rawChatCompletionsTestAccount()
+
+	result, err := svc.forwardAsRawChatCompletions(context.Background(), c, account, body, "")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Greater(t, result.Usage.InputTokens, 0, "输入 token 应本地估算，不为 0")
+	require.Greater(t, result.Usage.OutputTokens, 0, "输出 token 应本地估算，不为 0")
+}
+
+func TestEstimateTokensFromText(t *testing.T) {
+	require.Equal(t, 0, estimateTokensFromText(""))
+	require.Equal(t, 4, estimateTokensFromText("abcdefghijklmnop")) // 16 ASCII / 4
+	require.Greater(t, estimateTokensFromText("你好世界"), 0)          // CJK
+	require.Greater(t, estimateTokensFromText("hi 世界"), 0)          // 混合
+}
+
+func TestEstimateChatInputTokens(t *testing.T) {
+	require.Equal(t, 0, estimateChatInputTokens([]byte(`{}`)))
+	// 字符串 content：至少含每条消息 ~4 token 结构开销
+	require.Greater(t, estimateChatInputTokens([]byte(`{"messages":[{"role":"user","content":"hello world foo bar"}]}`)), 4)
+	// 多模态数组 content：取 text 部分
+	require.Greater(t, estimateChatInputTokens([]byte(`{"messages":[{"role":"user","content":[{"type":"text","text":"hi there friend"}]}]}`)), 4)
+}
+
 func TestForwardAsRawChatCompletions_PreservesDeepSeekReasoningContentNonStreaming(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
