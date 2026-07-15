@@ -10,6 +10,19 @@ permissions:
   contents: read
 
 jobs:
+  secret-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Scan tracked files
+        run: python tools/check_secrets.py
+      - name: Scan commits introduced by this event
+        if: github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000'
+        run: python tools/check_secrets.py --range "${{ github.event.before }}..${{ github.sha }}"
+
   backend-security:
     runs-on: ubuntu-latest
     timeout-minutes: 15

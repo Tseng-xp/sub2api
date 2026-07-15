@@ -51,8 +51,10 @@ pnpm-debug.log*
 .env
 .env.local
 .env.*.local
+.env.*
 *.env
 !.env.example
+!**/.env.example
 docker-compose.override.yml
 
 # IDE/Agent 生成的工作文档（可能含服务器信息，禁止入库）
@@ -64,6 +66,20 @@ servers.local.env
 *.secret
 secrets.local.*
 *.pem
+*.p12
+*.pfx
+*.ppk
+*.keystore
+*.kdbx
+*.tfvars
+*.tfstate
+*.tfstate.*
+id_rsa*
+id_ed25519*
+credentials.json
+service-account*.json
+.npmrc
+.pypirc
 
 # ===================
 # IDE / 编辑器
@@ -156,6 +172,7 @@ output/
 # ===================
 /sub2api
 check_*.py
+!tools/check_secrets.py
 test_*.py
 test_glm*.py
 deploy_custom.py

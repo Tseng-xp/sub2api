@@ -1,0 +1,12 @@
+#!/bin/sh
+set -eu
+
+if command -v python >/dev/null 2>&1; then
+  exec python tools/check_secrets.py --staged
+fi
+if command -v py >/dev/null 2>&1; then
+  exec py -3 tools/check_secrets.py --staged
+fi
+
+echo "Blocked: Python is required to scan staged files for credentials." >&2
+exit 1
