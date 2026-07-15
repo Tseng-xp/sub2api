@@ -1,7 +1,33 @@
 import { defineConfig, loadEnv, Plugin } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import checker from 'vite-plugin-checker'
+import { copyFileSync, mkdirSync } from 'node:fs'
 import { resolve } from 'path'
+
+/**
+ * Publish the standalone API documentation with the embedded frontend.
+ *
+ * The source files intentionally live in the repository-level docs directory,
+ * while the Go server embeds only backend/internal/web/dist. Copying them at
+ * build time keeps one source of truth and makes /docs/, /docs/en/, and
+ * /docs/zh/ available in every production image.
+ */
+function copyStaticDocs(): Plugin {
+  return {
+    name: 'copy-static-docs',
+    apply: 'build',
+    closeBundle() {
+      const sourceDir = resolve(__dirname, '../docs')
+      const outputDir = resolve(__dirname, '../backend/internal/web/dist/docs')
+
+      mkdirSync(resolve(outputDir, 'en'), { recursive: true })
+      mkdirSync(resolve(outputDir, 'zh'), { recursive: true })
+      copyFileSync(resolve(sourceDir, 'index.html'), resolve(outputDir, 'index.html'))
+      copyFileSync(resolve(sourceDir, 'index.html'), resolve(outputDir, 'en/index.html'))
+      copyFileSync(resolve(sourceDir, 'zh/index.html'), resolve(outputDir, 'zh/index.html'))
+    }
+  }
+}
 
 /**
  * Vite 插件：开发模式下注入公开配置到 index.html
@@ -46,7 +72,8 @@ export default defineConfig(({ mode }) => {
       checker({
         vueTsc: true
       }),
-      injectPublicSettings(backendUrl)
+      injectPublicSettings(backendUrl),
+      copyStaticDocs()
     ],
   resolve: {
     alias: {

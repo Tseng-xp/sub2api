@@ -32,9 +32,12 @@ RUN pnpm install --frozen-lockfile
 # LegalDocumentView.vue (admin-compliance gate) build-time imports
 # ../../../../docs/legal/*.md?raw, so docs/legal/ must sit beside frontend/
 # in the image (WORKDIR /app/frontend -> resolves to /app/docs/legal/*.md).
-# Copy only that subtree to keep the build dependency minimal.
+# Copy the legal documents used by the SPA and the standalone API docs that
+# the Vite build publishes under /docs/.
 COPY frontend/ ./
 COPY docs/legal/ /app/docs/legal/
+COPY docs/index.html /app/docs/index.html
+COPY docs/zh/index.html /app/docs/zh/index.html
 RUN pnpm run build
 
 # -----------------------------------------------------------------------------
