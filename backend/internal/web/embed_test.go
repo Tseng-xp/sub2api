@@ -641,6 +641,39 @@ func TestFrontendServer_Middleware(t *testing.T) {
 		assert.Equal(t, http.StatusOK, assetWriter.Code)
 		assert.Equal(t, staticAssetsCacheControl, assetWriter.Header().Get("Cache-Control"))
 	})
+
+	t.Run("serves_document_directory_indexes", func(t *testing.T) {
+		provider := &mockSettingsProvider{
+			settings: map[string]string{"test": "value"},
+		}
+
+		server, err := NewFrontendServer(provider)
+		require.NoError(t, err)
+
+		router := gin.New()
+		router.Use(server.Middleware())
+
+		tests := []struct {
+			path  string
+			title string
+		}{
+			{path: "/docs/", title: "TongYuan Aggregation API Documentation"},
+			{path: "/docs/en/", title: "TongYuan Aggregation API Documentation"},
+			{path: "/docs/zh/", title: "通元聚合 API 文档"},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.path, func(t *testing.T) {
+				w := httptest.NewRecorder()
+				req := httptest.NewRequest(http.MethodGet, tt.path, nil)
+				router.ServeHTTP(w, req)
+
+				assert.Equal(t, http.StatusOK, w.Code)
+				assert.Contains(t, w.Header().Get("Content-Type"), "text/html")
+				assert.Contains(t, w.Body.String(), tt.title)
+			})
+		}
+	})
 }
 
 func TestEmbeddedFrontendBypassesBareVideoAPIRoutes(t *testing.T) {
@@ -738,6 +771,25 @@ func TestServeEmbeddedFrontend(t *testing.T) {
 
 				assert.Equal(t, http.StatusOK, w.Code)
 				assert.Contains(t, w.Header().Get("Content-Type"), "text/html")
+			})
+		}
+	})
+
+	t.Run("serves_document_directory_indexes", func(t *testing.T) {
+		middleware := ServeEmbeddedFrontend()
+
+		router := gin.New()
+		router.Use(middleware)
+
+		for _, path := range []string{"/docs/", "/docs/en/", "/docs/zh/"} {
+			t.Run(path, func(t *testing.T) {
+				w := httptest.NewRecorder()
+				req := httptest.NewRequest(http.MethodGet, path, nil)
+				router.ServeHTTP(w, req)
+
+				assert.Equal(t, http.StatusOK, w.Code)
+				assert.Contains(t, w.Header().Get("Content-Type"), "text/html")
+				assert.NotContains(t, w.Body.String(), "Sub2API - AI API Gateway")
 			})
 		}
 	})

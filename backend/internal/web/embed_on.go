@@ -93,10 +93,7 @@ func (s *FrontendServer) Middleware() gin.HandlerFunc {
 			return
 		}
 
-		cleanPath := strings.TrimPrefix(path, "/")
-		if cleanPath == "" {
-			cleanPath = "index.html"
-		}
+		cleanPath := embeddedStaticLookupPath(path)
 
 		// For index.html or SPA routes, serve with injected settings
 		if cleanPath == "index.html" || !s.fileExists(cleanPath) {
@@ -123,6 +120,21 @@ func (s *FrontendServer) fileExists(path string) bool {
 	}
 	_ = file.Close()
 	return true
+}
+
+// embeddedStaticLookupPath maps directory-style URLs to the index file used
+// to decide whether an embedded static resource exists. http.FileServer still
+// receives the original request path and performs the actual directory index
+// serving; this lookup prevents /docs/ from being mistaken for an SPA route.
+func embeddedStaticLookupPath(requestPath string) string {
+	cleanPath := strings.TrimPrefix(requestPath, "/")
+	if cleanPath == "" {
+		return "index.html"
+	}
+	if strings.HasSuffix(requestPath, "/") {
+		return cleanPath + "index.html"
+	}
+	return cleanPath
 }
 
 // tryServeOverride checks if a local override file exists and serves it.
@@ -263,10 +275,7 @@ func ServeEmbeddedFrontend() gin.HandlerFunc {
 			return
 		}
 
-		cleanPath := strings.TrimPrefix(path, "/")
-		if cleanPath == "" {
-			cleanPath = "index.html"
-		}
+		cleanPath := embeddedStaticLookupPath(path)
 
 		if file, err := distFS.Open(cleanPath); err == nil {
 			_ = file.Close()
