@@ -306,7 +306,7 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 					usage = *u
 				}
 				if content := gjson.Get(payload, "choices.0.delta.content").String(); content != "" {
-					outputContent.WriteString(content)
+					_, _ = outputContent.WriteString(content)
 				}
 				if tier := gjson.Get(payload, "service_tier").String(); tier != "" {
 					responseServiceTier = tier
