@@ -404,11 +404,13 @@
             rel="noopener noreferrer"
             class="text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-dark-400 dark:hover:text-white"
           >{{ t('home.docs') }}</a>
-        </div>
-        <div v-if="showIcpBeian" class="mt-4 text-center text-xs text-gray-400 dark:text-dark-500">
-          <a href="https://beian.miit.gov.cn" target="_blank" rel="noopener noreferrer" class="hover:text-gray-600 dark:hover:text-dark-300 transition-colors">
-            粤ICP备2025408634号-4
-          </a>
+          <a
+            v-if="showIcpBeian"
+            href="https://beian.miit.gov.cn"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-dark-400 dark:hover:text-white"
+          >粤ICP备2025408634号-4</a>
         </div>
       </div>
     </footer>
@@ -423,7 +425,8 @@ import { useCurrencyStore } from '@/stores/currency'
 import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { buildGatewayUrl } from '@/api/client'
-import { getLocale } from '@/i18n'
+import { formatDateLocalInput } from '@/utils/format'
+import { sanitizeUrl } from '@/utils/url'
 
 const { t, locale } = useI18n()
 const appStore = useAppStore()
@@ -431,21 +434,15 @@ const currencyStore = useCurrencyStore()
 
 // ==================== Site Settings (same as HomeView) ====================
 
-// 备案号仅在中国大陆(.cn)域名显示：国内服务器要备案，国外(.com)不需要。
-const showIcpBeian = computed(() => typeof window !== 'undefined' && window.location.hostname.endsWith('.cn'))
 const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || 'Sub2API')
-const siteLogo = computed(() => appStore.cachedPublicSettings?.site_logo || appStore.siteLogo || '')
-const docUrl = computed(() => appStore.cachedPublicSettings?.doc_url || appStore.docUrl || '')
-
+const siteLogo = computed(() => sanitizeUrl(appStore.cachedPublicSettings?.site_logo || appStore.siteLogo || '', { allowRelative: true, allowDataUrl: true }))
+const docUrl = computed(() => sanitizeUrl(appStore.cachedPublicSettings?.doc_url || appStore.docUrl || ''))
 const localizedDocUrl = computed(() => {
-  const url = docUrl.value
-  if (!url) return ''
-  const locale = getLocale()
-  if (locale === 'zh') {
-    return url.replace(/\/docs\/(zh\/)?/, '/docs/zh/')
-  }
-  return url.replace(/\/docs\/zh\//, '/docs/')
+  if (!docUrl.value) return ''
+  if (locale.value === 'zh') return docUrl.value.replace(/\/docs\/(?:zh\/)?/, '/docs/zh/')
+  return docUrl.value.replace('/docs/zh/', '/docs/')
 })
+const showIcpBeian = computed(() => typeof window !== 'undefined' && window.location.hostname.toLowerCase().endsWith('.cn'))
 
 // ==================== Theme (same as HomeView) ====================
 
@@ -502,7 +499,6 @@ function setDateRange(key: DateRangeKey) {
 
 function getDateParams(): string {
   const now = new Date()
-  const fmt = (d: Date) => d.toISOString().split('T')[0]
   const params = new URLSearchParams()
 
   if (currentRange.value === 'custom') {
@@ -511,13 +507,13 @@ function getDateParams(): string {
       params.set('end_date', customEndDate.value)
     }
   } else {
-    const end = fmt(now)
+    const end = formatDateLocalInput(now)
     let start: string
     switch (currentRange.value) {
       case 'today': start = end; break
-      case '7d': start = fmt(new Date(now.getTime() - 7 * 86400000)); break
-      case '30d': start = fmt(new Date(now.getTime() - 30 * 86400000)); break
-      default: start = fmt(new Date(now.getTime() - 30 * 86400000))
+      case '7d': start = formatDateLocalInput(new Date(now.getTime() - 7 * 86400000)); break
+      case '30d': start = formatDateLocalInput(new Date(now.getTime() - 30 * 86400000)); break
+      default: start = formatDateLocalInput(new Date(now.getTime() - 30 * 86400000))
     }
     params.set('start_date', start)
     params.set('end_date', end)

@@ -22,11 +22,14 @@ ZERO_SHA = "0" * 40
 
 ALLOWED_PRIVATE_KEY_FIXTURES = {
     "backend/internal/payment/provider/wxpay_test.go",
+    "backend/internal/service/batch_image_provider_vertex_test.go",
     "backend/internal/service/vertex_service_account_test.go",
     "frontend/src/components/account/__tests__/EditAccountModal.spec.ts",
 }
 ALLOWED_CREDENTIAL_URL_FIXTURES = {
     "backend/internal/pkg/proxyurl/parse_test.go",
+    "backend/internal/pkg/xai/oauth_test.go",
+    "backend/internal/service/grok_upstream_url_test.go",
     "backend/internal/service/proxy_test.go",
 }
 
@@ -192,6 +195,8 @@ def concrete_assignment_value(raw: str) -> bool:
         value = value[1:-1].strip()
     lowered = value.lower()
     if not value or len(value) < 6:
+        return False
+    if re.fullmatch(r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?", value):
         return False
     if lowered.startswith(REFERENCE_PREFIXES):
         return False

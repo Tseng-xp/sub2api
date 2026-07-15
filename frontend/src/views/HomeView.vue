@@ -390,9 +390,13 @@
           >
             {{ t('home.docs') }}
           </a>
-        </div>
-        <div v-if="showIcpBeian" class="mt-4 text-center text-xs text-gray-400 dark:text-dark-500">
-          <a href="https://beian.miit.gov.cn" target="_blank" rel="noopener noreferrer" class="hover:text-gray-600 dark:hover:text-dark-300 transition-colors">
+          <a
+            v-if="showIcpBeian"
+            href="https://beian.miit.gov.cn"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-dark-400 dark:hover:text-white"
+          >
             粤ICP备2025408634号-4
           </a>
         </div>
@@ -407,31 +411,25 @@ import { useI18n } from 'vue-i18n'
 import { useAuthStore, useAppStore } from '@/stores'
 import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
 import Icon from '@/components/icons/Icon.vue'
-import { getLocale } from '@/i18n'
+import { sanitizeUrl } from '@/utils/url'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const authStore = useAuthStore()
 const appStore = useAppStore()
 
 // Site settings - directly from appStore (already initialized from injected config)
 const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || 'Sub2API')
-const siteLogo = computed(() => appStore.cachedPublicSettings?.site_logo || appStore.siteLogo || '')
+const siteLogo = computed(() => sanitizeUrl(appStore.cachedPublicSettings?.site_logo || appStore.siteLogo || '', { allowRelative: true, allowDataUrl: true }))
 const siteSubtitle = computed(() => appStore.cachedPublicSettings?.site_subtitle || 'AI API Gateway Platform')
-const docUrl = computed(() => appStore.cachedPublicSettings?.doc_url || appStore.docUrl || '')
-const homeContent = computed(() => appStore.cachedPublicSettings?.home_content || '')
-// 备案号仅在中国大陆(.cn)域名显示：国内服务器要备案，国外(.com)不需要。
-const showIcpBeian = computed(() => typeof window !== 'undefined' && window.location.hostname.endsWith('.cn'))
-
+const docUrl = computed(() => sanitizeUrl(appStore.cachedPublicSettings?.doc_url || appStore.docUrl || ''))
 const localizedDocUrl = computed(() => {
-  const url = docUrl.value
-  if (!url) return ''
-  const locale = getLocale()
-  if (locale === 'zh') {
-    return url.replace(/\/docs\/(zh\/)?/, '/docs/zh/')
-  }
-  return url.replace(/\/docs\/zh\//, '/docs/')
+  if (!docUrl.value) return ''
+  if (locale.value === 'zh') return docUrl.value.replace(/\/docs\/(?:zh\/)?/, '/docs/zh/')
+  return docUrl.value.replace('/docs/zh/', '/docs/')
 })
+const homeContent = computed(() => appStore.cachedPublicSettings?.home_content || '')
+const showIcpBeian = computed(() => typeof window !== 'undefined' && window.location.hostname.toLowerCase().endsWith('.cn'))
 
 // Check if homeContent is a URL (for iframe display)
 const isHomeContentUrl = computed(() => {

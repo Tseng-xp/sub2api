@@ -38,8 +38,6 @@
           <span class="hidden sm:inline">{{ t('nav.docs') }}</span>
         </a>
 
-        
-
         <!-- Language Switcher -->
         <LocaleSwitcher />
 
@@ -49,7 +47,7 @@
         <!-- Balance Display -->
         <div
           v-if="user"
-          class="hidden items-center gap-2 rounded-xl bg-primary-50 px-3 py-1.5 dark:bg-primary-900/20 sm:flex"
+          class="group relative hidden items-center gap-2 rounded-xl bg-primary-50 px-3 py-1.5 dark:bg-primary-900/20 sm:flex"
         >
           <svg
             class="h-4 w-4 text-primary-600 dark:text-primary-400"
@@ -65,8 +63,32 @@
             />
           </svg>
           <span class="text-sm font-semibold text-primary-700 dark:text-primary-300">
-            {{ formatHeaderBalance(user.balance) }}
+            {{ formatHeaderMoney(availableBalance) }}
           </span>
+          <span
+            v-if="frozenBalance > 0"
+            class="rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-200"
+          >
+            {{ balanceFrozenLabel }}
+          </span>
+          <div
+            class="pointer-events-none absolute right-0 top-full mt-2 hidden w-56 rounded-lg border border-gray-200 bg-white p-3 text-xs shadow-lg group-hover:block dark:border-dark-700 dark:bg-dark-800"
+          >
+            <div class="flex items-center justify-between">
+              <span class="text-gray-500 dark:text-dark-400">{{ balanceAvailableText }}</span>
+              <span class="font-medium text-gray-900 dark:text-white">{{ formatHeaderMoney(availableBalance) }}</span>
+            </div>
+            <div class="mt-2 flex items-center justify-between">
+              <span class="text-gray-500 dark:text-dark-400">{{ balanceFrozenText }}</span>
+              <span class="font-medium text-amber-700 dark:text-amber-200">{{ formatHeaderMoney(frozenBalance) }}</span>
+            </div>
+            <div class="mt-2 border-t border-gray-100 pt-2 dark:border-dark-700">
+              <div class="flex items-center justify-between">
+                <span class="text-gray-500 dark:text-dark-400">{{ balanceTotalText }}</span>
+                <span class="font-semibold text-gray-900 dark:text-white">{{ formatHeaderMoney(totalBalance) }}</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- User Dropdown -->
@@ -113,7 +135,10 @@
                   {{ t('common.balance') }}
                 </div>
                 <div class="text-sm font-semibold text-primary-600 dark:text-primary-400">
-                  {{ formatHeaderBalance(user.balance) }}
+                  {{ formatHeaderMoney(availableBalance) }}
+                </div>
+                <div v-if="frozenBalance > 0" class="mt-1 text-xs text-amber-600 dark:text-amber-300">
+                  {{ balanceFrozenText }} {{ formatHeaderMoney(frozenBalance) }}
                 </div>
               </div>
 
@@ -225,43 +250,35 @@ import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
 import SubscriptionProgressMini from '@/components/common/SubscriptionProgressMini.vue'
 import AnnouncementBell from '@/components/common/AnnouncementBell.vue'
 import Icon from '@/components/icons/Icon.vue'
-import { getLocale } from '@/i18n'
+import { sanitizeUrl } from '@/utils/url'
 
 const router = useRouter()
 const route = useRoute()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const appStore = useAppStore()
 const authStore = useAuthStore()
+const currencyStore = useCurrencyStore()
 const adminSettingsStore = useAdminSettingsStore()
 const onboardingStore = useOnboardingStore()
-const currencyStore = useCurrencyStore()
-
-// 顶栏余额专用：按展示币种换算 + 对应符号 + 千分位，固定 2 位小数。
-// 仅用于顶栏，不改共享的 currencyStore.formatAmount（其它页面显示规则不变）。
-function formatHeaderBalance(value: number | null | undefined): string {
-  const amount = currencyStore.convertAmount(value ?? 0)
-  return `${currencyStore.currencySymbol}${amount.toLocaleString('zh-CN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`
-}
 
 const user = computed(() => authStore.user)
 const dropdownOpen = ref(false)
 const dropdownRef = ref<HTMLElement | null>(null)
 const contactInfo = computed(() => appStore.contactInfo)
-const docUrl = computed(() => appStore.docUrl)
-const avatarUrl = computed(() => user.value?.avatar_url?.trim() || '')
-
+const docUrl = computed(() => sanitizeUrl(appStore.docUrl))
 const localizedDocUrl = computed(() => {
-  const url = docUrl.value
-  if (!url) return ''
-  const locale = getLocale()
-  if (locale === 'zh') {
-    return url.replace(/\/docs\/(zh\/)?/, '/docs/zh/')
-  }
-  return url.replace(/\/docs\/zh\//, '/docs/')
+  if (!docUrl.value) return ''
+  if (locale.value === 'zh') return docUrl.value.replace(/\/docs\/(?:zh\/)?/, '/docs/zh/')
+  return docUrl.value.replace('/docs/zh/', '/docs/')
 })
+const avatarUrl = computed(() => user.value?.avatar_url?.trim() || '')
+const availableBalance = computed(() => Number(user.value?.balance || 0))
+const frozenBalance = computed(() => Number(user.value?.frozen_balance || 0))
+const totalBalance = computed(() => availableBalance.value + frozenBalance.value)
+const balanceAvailableText = computed(() => t('common.availableBalance') === 'common.availableBalance' ? '可用余额' : t('common.availableBalance'))
+const balanceFrozenText = computed(() => t('common.frozenBalance') === 'common.frozenBalance' ? '冻结金额' : t('common.frozenBalance'))
+const balanceTotalText = computed(() => t('common.totalBalance') === 'common.totalBalance' ? '总余额' : t('common.totalBalance'))
+const balanceFrozenLabel = computed(() => `${balanceFrozenText.value} ${formatHeaderMoney(frozenBalance.value)}`)
 
 // 只在标准模式的管理员下显示新手引导按钮
 const showOnboardingButton = computed(() => {
@@ -337,6 +354,14 @@ async function handleLogout() {
 function handleReplayGuide() {
   closeDropdown()
   onboardingStore.replay()
+}
+
+function formatHeaderMoney(value: number) {
+  const converted = currencyStore.convertAmount(Number.isFinite(value) ? value : 0)
+  return `${currencyStore.currencySymbol}${converted.toLocaleString(locale.value === 'zh' ? 'zh-CN' : 'en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  })}`
 }
 
 function handleClickOutside(event: MouseEvent) {

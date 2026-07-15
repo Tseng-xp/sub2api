@@ -122,14 +122,12 @@ func TestForwardAsRawChatCompletions_ForcesStreamUsageUpstreamAndPassesUsageDown
 	require.Contains(t, rec.Body.String(), "data: [DONE]")
 }
 
-// 模拟部分上游/中转流式即使请求了 include_usage 也不返回 usage 帧、也不发 [DONE] 的情况：
-// 网关必须本地估算 token 计费，而不是记 0 造成免费漏收。
 func TestForwardAsRawChatCompletions_EstimatesUsageWhenUpstreamOmitsStreamUsage(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	body := []byte(`{"model":"deepseek-v4-pro","messages":[{"role":"user","content":"用一句话介绍一下你自己"}],"stream":true}`)
-	rec := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(rec)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(body))
 	c.Request.Header.Set("Content-Type", "application/json")
 
@@ -145,32 +143,109 @@ func TestForwardAsRawChatCompletions_EstimatesUsageWhenUpstreamOmitsStreamUsage(
 		Body:       io.NopCloser(strings.NewReader(upstreamBody)),
 	}}
 
+	service := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
+	result, err := service.forwardAsRawChatCompletions(context.Background(), c, rawChatCompletionsTestAccount(), body, "")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Greater(t, result.Usage.InputTokens, 0)
+	require.Greater(t, result.Usage.OutputTokens, 0)
+}
+
+func TestEstimateTokensFromText(t *testing.T) {
+	require.Equal(t, 0, estimateTokensFromText(""))
+	require.Equal(t, 4, estimateTokensFromText("abcdefghijklmnop"))
+	require.Greater(t, estimateTokensFromText("你好世界"), 0)
+	require.Greater(t, estimateTokensFromText("hi 世界"), 0)
+}
+
+func TestEstimateChatInputTokens(t *testing.T) {
+	require.Equal(t, 0, estimateChatInputTokens([]byte(`{}`)))
+	require.Greater(t, estimateChatInputTokens([]byte(`{"messages":[{"role":"user","content":"hello world foo bar"}]}`)), 4)
+	require.Greater(t, estimateChatInputTokens([]byte(`{"messages":[{"role":"user","content":[{"type":"text","text":"hi there friend"}]}]}`)), 4)
+}
+
+func TestForwardAsRawChatCompletions_PreservesMappedGPT56MaxEffort(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	body := []byte(`{"model":"sol","messages":[{"role":"user","content":"hello"}],"reasoning_effort":"max","stream":false}`)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	upstream := &httpUpstreamRecorder{resp: &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body: io.NopCloser(strings.NewReader(
+			`{"id":"chatcmpl_max","object":"chat.completion","model":"gpt-5.6-sol","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":3,"completion_tokens":2,"total_tokens":5}}`,
+		)),
+	}}
 	svc := &OpenAIGatewayService{
 		cfg:          rawChatCompletionsTestConfig(),
 		httpUpstream: upstream,
 	}
 	account := rawChatCompletionsTestAccount()
+	account.Credentials["model_mapping"] = map[string]any{"sol": "gpt-5.6-sol"}
 
 	result, err := svc.forwardAsRawChatCompletions(context.Background(), c, account, body, "")
+
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	require.Greater(t, result.Usage.InputTokens, 0, "输入 token 应本地估算，不为 0")
-	require.Greater(t, result.Usage.OutputTokens, 0, "输出 token 应本地估算，不为 0")
+	require.Equal(t, "gpt-5.6-sol", gjson.GetBytes(upstream.lastBody, "model").String())
+	require.Equal(t, "max", gjson.GetBytes(upstream.lastBody, "reasoning_effort").String())
+	require.NotNil(t, result.ReasoningEffort)
+	require.Equal(t, "max", *result.ReasoningEffort)
 }
 
-func TestEstimateTokensFromText(t *testing.T) {
-	require.Equal(t, 0, estimateTokensFromText(""))
-	require.Equal(t, 4, estimateTokensFromText("abcdefghijklmnop")) // 16 ASCII / 4
-	require.Greater(t, estimateTokensFromText("你好世界"), 0)          // CJK
-	require.Greater(t, estimateTokensFromText("hi 世界"), 0)          // 混合
-}
+func TestForwardAsRawChatCompletions_NonStreamingCapturesCacheWriteUsage(t *testing.T) {
+	gin.SetMode(gin.TestMode)
 
-func TestEstimateChatInputTokens(t *testing.T) {
-	require.Equal(t, 0, estimateChatInputTokens([]byte(`{}`)))
-	// 字符串 content：至少含每条消息 ~4 token 结构开销
-	require.Greater(t, estimateChatInputTokens([]byte(`{"messages":[{"role":"user","content":"hello world foo bar"}]}`)), 4)
-	// 多模态数组 content：取 text 部分
-	require.Greater(t, estimateChatInputTokens([]byte(`{"messages":[{"role":"user","content":[{"type":"text","text":"hi there friend"}]}]}`)), 4)
+	tests := []struct {
+		name      string
+		usageJSON string
+		wantWrite int
+	}{
+		{
+			name:      "positive cache write",
+			usageJSON: `{"prompt_tokens":12,"completion_tokens":3,"total_tokens":15,"prompt_tokens_details":{"cached_tokens":4,"cache_write_tokens":6}}`,
+			wantWrite: 6,
+		},
+		{
+			name:      "nested zero overrides legacy alias",
+			usageJSON: `{"prompt_tokens":12,"completion_tokens":3,"total_tokens":15,"cache_creation_input_tokens":19,"prompt_tokens_details":{"cached_tokens":4,"cache_write_tokens":0}}`,
+			wantWrite: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			body := []byte(`{"model":"gpt-5.6","messages":[{"role":"user","content":"hello"}],"stream":false}`)
+			rec := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(rec)
+			c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(body))
+			c.Request.Header.Set("Content-Type", "application/json")
+
+			upstream := &httpUpstreamRecorder{resp: &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     http.Header{"Content-Type": []string{"application/json"}},
+				Body: io.NopCloser(strings.NewReader(
+					`{"id":"chatcmpl_cache","object":"chat.completion","model":"gpt-5.6","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],"usage":` + tt.usageJSON + `}`,
+				)),
+			}}
+			svc := &OpenAIGatewayService{
+				cfg:          rawChatCompletionsTestConfig(),
+				httpUpstream: upstream,
+			}
+
+			result, err := svc.forwardAsRawChatCompletions(context.Background(), c, rawChatCompletionsTestAccount(), body, "")
+
+			require.NoError(t, err)
+			require.NotNil(t, result)
+			require.Equal(t, 12, result.Usage.InputTokens)
+			require.Equal(t, 4, result.Usage.CacheReadInputTokens)
+			require.Equal(t, tt.wantWrite, result.Usage.CacheCreationInputTokens)
+		})
+	}
 }
 
 func TestForwardAsRawChatCompletions_PreservesDeepSeekReasoningContentNonStreaming(t *testing.T) {

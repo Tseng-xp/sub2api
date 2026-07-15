@@ -1,21 +1,15 @@
 package service
 
 import (
-	"bufio"
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 	"time"
 	"unicode"
 
-	"github.com/Wei-Shaw/sub2api/internal/pkg/apicompat"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/xai"
 	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/gin-gonic/gin"
 	"github.com/tidwall/gjson"
@@ -76,13 +70,19 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 	}
 	clientStream := gjson.GetBytes(body, "stream").Bool()
 
-	// 1b. Extract reasoning effort and service tier from the raw body before any transformation.
-	reasoningEffort := extractOpenAIReasoningEffortFromBody(body, originalModel)
+	// 1b. Extract service tier from the raw body before any transformation.
 	serviceTier := extractOpenAIServiceTierFromBody(body)
 
 	// 2. Resolve model mapping (same as ForwardAsChatCompletions)
 	billingModel := resolveOpenAIForwardModel(account, originalModel, defaultMappedModel)
 	upstreamModel := normalizeOpenAIModelForUpstream(account, billingModel)
+	grokCacheIdentity := ""
+	if account.Platform == PlatformGrok {
+		// Resolve before image bridging or other body rewrites so the fallback is
+		// anchored to the client's stable conversation prefix.
+		grokCacheIdentity = resolveGrokCacheIdentity(c, body, "", upstreamModel)
+	}
+	reasoningEffort := extractOpenAIReasoningEffortFromBody(body, upstreamModel, billingModel, originalModel)
 	// 国产模型默认 effort 补充：需要 mappedModel 判定，推迟到 billingModel 算出之后。
 	reasoningEffort = ApplyThinkingEnabledFallback(reasoningEffort, body, billingModel)
 
@@ -109,7 +109,7 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 
 	// Grok Composer does not accept image_url parts directly, but Grok Build
 	// can describe the images first. Bridge only this exact failure mode.
-	token, tokenKind, err := s.GetAccessToken(ctx, account)
+	token, tokenKind, err := s.getRequestCredential(ctx, c, account)
 	if err != nil {
 		return nil, err
 	}
@@ -140,6 +140,12 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 			return nil, fmt.Errorf("enable stream usage: %w", usageErr)
 		}
 	}
+	if account.Platform == PlatformGrok {
+		upstreamBody, err = stripGrokChatPromptCacheKey(upstreamBody)
+		if err != nil {
+			return nil, fmt.Errorf("remove Responses-only Grok prompt cache key: %w", err)
+		}
+	}
 
 	logger.L().Debug("openai chat_completions raw: forwarding without protocol conversion",
 		zap.Int64("account_id", account.ID),
@@ -149,68 +155,25 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 		zap.Bool("stream", clientStream),
 	)
 
-	// 5. Build upstream request
+	// 5. Build and send upstream request via the shared CC pipeline
 	targetURL, err := s.rawChatCompletionsURL(account)
 	if err != nil {
 		return nil, err
 	}
-
-	upstreamCtx, releaseUpstreamCtx := detachUpstreamContext(ctx)
-	upstreamReq, err := http.NewRequestWithContext(upstreamCtx, http.MethodPost, targetURL, bytes.NewReader(upstreamBody))
-	releaseUpstreamCtx()
-	if err != nil {
-		return nil, fmt.Errorf("build upstream request: %w", err)
-	}
-	upstreamReq = upstreamReq.WithContext(WithHTTPUpstreamProfile(upstreamReq.Context(), HTTPUpstreamProfileOpenAI))
-	upstreamReq.Header.Set("Content-Type", "application/json")
-	upstreamReq.Header.Set("Authorization", "Bearer "+token)
-	if clientStream {
-		upstreamReq.Header.Set("Accept", "text/event-stream")
-	} else {
-		upstreamReq.Header.Set("Accept", "application/json")
-	}
-
-	// 透传白名单中的客户端 header。详见 openaiCCRawAllowedHeaders 的设计说明。
-	for key, values := range c.Request.Header {
-		lowerKey := strings.ToLower(key)
-		if openaiCCRawAllowedHeaders[lowerKey] {
-			for _, v := range values {
-				upstreamReq.Header.Add(key, v)
-			}
-		}
-	}
+	SetActualOpenAIUpstreamEndpoint(c, grokChatRawEndpoint)
 	customUA := account.GetOpenAIUserAgent()
-	if customUA != "" {
-		upstreamReq.Header.Set("user-agent", customUA)
-	} else if account.Platform == PlatformGrok {
-		upstreamReq.Header.Set("user-agent", "sub2api-grok/1.0")
+	if customUA == "" && account.IsGrokOAuth() {
+		customUA = "sub2api-grok/1.0"
 	}
-
-	// 账号级请求头覆写（仅 openai api_key 账号启用时生效）
-	account.ApplyHeaderOverrides(upstreamReq.Header)
-
-	// 6. Send request
-	proxyURL := ""
-	if account.Proxy != nil {
-		proxyURL = account.Proxy.URL()
-	}
-	resp, err := s.httpUpstream.Do(upstreamReq, proxyURL, account.ID, account.Concurrency)
+	resp, err := s.sendCCUpstreamRequest(ctx, c, account, targetURL, upstreamBody, clientStream, token, customUA, grokCacheIdentity)
 	if err != nil {
-		return nil, s.handleOpenAIUpstreamTransportError(ctx, c, account, err, false)
+		return nil, err
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	// 7. Handle error response with failover
 	if resp.StatusCode >= 400 {
-		respBody := s.readUpstreamErrorBody(resp)
-		_ = resp.Body.Close()
-		resp.Body = io.NopCloser(bytes.NewReader(respBody))
-		if account.Platform == PlatformGrok {
-			s.updateGrokUsageSnapshot(ctx, account.ID, xai.ParseQuotaHeaders(resp.Header, resp.StatusCode))
-		}
-
-		upstreamMsg := strings.TrimSpace(extractUpstreamErrorMessage(respBody))
-		upstreamMsg = sanitizeUpstreamErrorMessage(upstreamMsg)
+		respBody, upstreamMsg := s.readOpenAIUpstreamError(resp)
 		if account.Platform == PlatformGrok {
 			appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
 				Platform:           account.Platform,
@@ -226,42 +189,20 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 				return nil, &UpstreamFailoverError{
 					StatusCode:             resp.StatusCode,
 					ResponseBody:           respBody,
+					ResponseHeaders:        resp.Header.Clone(),
 					RetryableOnSameAccount: account.IsPoolMode() && account.IsPoolModeRetryableStatus(resp.StatusCode),
 				}
 			}
 			return s.handleChatCompletionsErrorResponse(resp, c, account, billingModel)
 		}
-		if s.shouldFailoverOpenAIUpstreamResponse(resp.StatusCode, upstreamMsg, respBody) {
-			upstreamDetail := ""
-			if s.cfg != nil && s.cfg.Gateway.LogUpstreamErrorBody {
-				maxBytes := s.cfg.Gateway.LogUpstreamErrorBodyMaxBytes
-				if maxBytes <= 0 {
-					maxBytes = 2048
-				}
-				upstreamDetail = truncateString(string(respBody), maxBytes)
-			}
-			appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
-				Platform:           account.Platform,
-				AccountID:          account.ID,
-				AccountName:        account.Name,
-				UpstreamStatusCode: resp.StatusCode,
-				UpstreamRequestID:  resp.Header.Get("x-request-id"),
-				Kind:               "failover",
-				Message:            upstreamMsg,
-				Detail:             upstreamDetail,
-			})
-			s.handleOpenAIAccountUpstreamError(ctx, account, resp.StatusCode, resp.Header, respBody, upstreamModel)
-			return nil, &UpstreamFailoverError{
-				StatusCode:             resp.StatusCode,
-				ResponseBody:           respBody,
-				RetryableOnSameAccount: account.IsPoolMode() && (account.IsPoolModeRetryableStatus(resp.StatusCode) || isOpenAITransientProcessingError(resp.StatusCode, upstreamMsg, respBody)),
-			}
+		if foErr := s.failoverOpenAIUpstreamHTTPError(ctx, c, account, resp, respBody, upstreamMsg, upstreamModel); foErr != nil {
+			return nil, foErr
 		}
 		return s.handleChatCompletionsErrorResponse(resp, c, account, billingModel)
 	}
 
 	if account.Platform == PlatformGrok {
-		s.updateGrokUsageSnapshot(ctx, account.ID, xai.ParseQuotaHeaders(resp.Header, resp.StatusCode))
+		s.updateGrokUsageFromResponse(ctx, account, resp.Header, resp.StatusCode)
 	}
 
 	// 8. Forward response
@@ -274,28 +215,21 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 	}
 	if result != nil {
 		addOpenAIUsage(&result.Usage, bridgeUsage)
+		result.UpstreamEndpoint = grokChatRawEndpoint
 	}
 	return result, forwardErr
 }
 
 func (s *OpenAIGatewayService) rawChatCompletionsURL(account *Account) (string, error) {
 	if account.Platform == PlatformGrok {
-		targetURL, err := xai.BuildChatCompletionsURL(account.GetGrokBaseURL())
+		targetURL, err := buildGrokChatCompletionsURL(account, s.cfg)
 		if err != nil {
 			return "", fmt.Errorf("invalid grok base_url: %w", err)
 		}
 		return targetURL, nil
 	}
 
-	baseURL := account.GetOpenAIBaseURL()
-	if baseURL == "" {
-		baseURL = "https://api.openai.com"
-	}
-	validatedURL, err := s.validateUpstreamBaseURL(baseURL)
-	if err != nil {
-		return "", fmt.Errorf("invalid base_url: %w", err)
-	}
-	return buildOpenAIChatCompletionsURL(validatedURL), nil
+	return s.openAIChatCompletionsTargetURL(account)
 }
 
 // streamRawChatCompletions 透传上游 CC SSE 流到客户端，并提取 usage（包括
@@ -317,34 +251,13 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 	requestBody []byte,
 ) (*OpenAIForwardResult, error) {
 	requestID := resp.Header.Get("x-request-id")
-
-	headersWritten := false
-	writeStreamHeaders := func() {
-		if headersWritten {
-			return
-		}
-		headersWritten = true
-		if s.responseHeaderFilter != nil {
-			responseheaders.WriteFilteredHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)
-		}
-		c.Writer.Header().Set("Content-Type", "text/event-stream")
-		c.Writer.Header().Set("Cache-Control", "no-cache")
-		c.Writer.Header().Set("Connection", "keep-alive")
-		c.Writer.Header().Set("X-Accel-Buffering", "no")
-		c.Writer.WriteHeader(http.StatusOK)
-	}
-
-	scanner := bufio.NewScanner(resp.Body)
-	maxLineSize := defaultMaxLineSize
-	if s.cfg != nil && s.cfg.Gateway.MaxLineSize > 0 {
-		maxLineSize = s.cfg.Gateway.MaxLineSize
-	}
-	scanner.Buffer(make([]byte, 0, 64*1024), maxLineSize)
+	writeStreamHeaders := s.newStreamHeaderWriter(c, resp.Header)
+	scanner := s.newUpstreamSSEScanner(resp.Body)
 
 	var usage OpenAIUsage
-	var respServiceTier string
+	var responseServiceTier string
 	var firstTokenMs *int
-	var outputContent strings.Builder // 累积流式输出内容，用于上游未返回 usage 时本地估算 token
+	var outputContent strings.Builder
 	clientDisconnected := false
 	clientOutputStarted := false
 	pendingLines := make([]string, 0, 8)
@@ -392,12 +305,11 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 				if u := extractCCStreamUsage(payload); u != nil {
 					usage = *u
 				}
-				// 累积输出内容，作为上游不返回 usage 时的兜底估算依据
 				if content := gjson.Get(payload, "choices.0.delta.content").String(); content != "" {
 					outputContent.WriteString(content)
 				}
-				if st := gjson.Get(payload, "service_tier").String(); st != "" {
-					respServiceTier = st
+				if tier := gjson.Get(payload, "service_tier").String(); tier != "" {
+					responseServiceTier = tier
 				}
 				if firstTokenMs == nil && !usageOnlyChunk {
 					elapsed := int(time.Since(startTime).Milliseconds())
@@ -448,21 +360,20 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 		}
 	}
 
-	// 兜底：上游流式未返回 usage 帧（部分中转/供应商即便请求了 include_usage 也不发 usage，
-	// 会导致本网关记 0 token = 免费漏收）。此时用本地估算填补，避免免费。
-	// 仅在完全没有 usage 时启用；一旦上游给了任何 usage 就以上游为准。
+	// Some compatible upstreams ignore include_usage. Estimate only when every
+	// upstream usage counter is absent so a successfully served request is not free.
 	if usage.InputTokens == 0 && usage.OutputTokens == 0 && usage.CacheReadInputTokens == 0 {
-		estIn := estimateChatInputTokens(requestBody)
-		estOut := estimateTokensFromText(outputContent.String())
-		if estIn > 0 || estOut > 0 {
-			usage.InputTokens = estIn
-			usage.OutputTokens = estOut
-			logger.L().Warn("openai chat_completions raw: 上游流式未返回 usage，改用本地估算计费（防免费漏收）；建议核查上游 include_usage 支持或更换上游",
+		estimatedInput := estimateChatInputTokens(requestBody)
+		estimatedOutput := estimateTokensFromText(outputContent.String())
+		if estimatedInput > 0 || estimatedOutput > 0 {
+			usage.InputTokens = estimatedInput
+			usage.OutputTokens = estimatedOutput
+			logger.L().Warn("openai chat_completions raw: upstream omitted stream usage; using local billing estimate",
 				zap.String("request_id", requestID),
 				zap.String("billing_model", billingModel),
 				zap.String("upstream_model", upstreamModel),
-				zap.Int("est_input_tokens", estIn),
-				zap.Int("est_output_tokens", estOut),
+				zap.Int("estimated_input_tokens", estimatedInput),
+				zap.Int("estimated_output_tokens", estimatedOutput),
 			)
 		}
 	}
@@ -474,16 +385,15 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 		BillingModel:    billingModel,
 		UpstreamModel:   upstreamModel,
 		ReasoningEffort: reasoningEffort,
-		ServiceTier:     preferResponseServiceTier(respServiceTier, serviceTier),
+		ServiceTier:     preferResponseServiceTier(responseServiceTier, serviceTier),
 		Stream:          true,
 		Duration:        time.Since(startTime),
 		FirstTokenMs:    firstTokenMs,
 	}, nil
 }
 
-// estimateTokensFromText 在上游未返回 usage 时对文本做跨语言 token 估算（仅兜底用）。
-// 经验值：ASCII≈4 字符/token；中日韩(CJK)≈0.6 token/字符；其它≈2 字符/token。
-// 目标是"不为 0 且量级合理"，非精确值。
+// estimateTokensFromText provides a conservative multilingual fallback used
+// only when a compatible upstream omits usage entirely.
 func estimateTokensFromText(text string) int {
 	if text == "" {
 		return 0
@@ -500,8 +410,8 @@ func estimateTokensFromText(text string) int {
 		}
 	}
 	tokens := ascii/4 + (cjk*3)/5 + other/2
-	if tokens < 1 && (ascii+cjk+other) > 0 {
-		tokens = 1
+	if tokens < 1 && ascii+cjk+other > 0 {
+		return 1
 	}
 	return tokens
 }
@@ -511,26 +421,24 @@ func isCJKRune(r rune) bool {
 		unicode.Is(unicode.Katakana, r) || unicode.Is(unicode.Hangul, r)
 }
 
-// estimateChatInputTokens 从 Chat Completions 请求体的 messages 估算输入 token（仅兜底用）。
-// content 支持字符串或多模态数组（取其中 text 部分）；每条消息加 ~4 token 结构开销。
 func estimateChatInputTokens(body []byte) int {
 	if len(body) == 0 {
 		return 0
 	}
-	total := 0
 	messages := gjson.GetBytes(body, "messages")
 	if !messages.IsArray() {
 		return 0
 	}
-	for _, m := range messages.Array() {
-		content := m.Get("content")
+	total := 0
+	for _, message := range messages.Array() {
+		content := message.Get("content")
 		switch {
 		case content.Type == gjson.String:
 			total += estimateTokensFromText(content.String())
 		case content.IsArray():
 			for _, part := range content.Array() {
-				if t := part.Get("text"); t.Exists() {
-					total += estimateTokensFromText(t.String())
+				if value := part.Get("text"); value.Exists() {
+					total += estimateTokensFromText(value.String())
 				}
 			}
 		}
@@ -568,12 +476,9 @@ func extractCCStreamUsage(payload string) *OpenAIUsage {
 	if !usageResult.Exists() || !usageResult.IsObject() {
 		return nil
 	}
-	u := OpenAIUsage{
-		InputTokens:  int(gjson.Get(payload, "usage.prompt_tokens").Int()),
-		OutputTokens: int(gjson.Get(payload, "usage.completion_tokens").Int()),
-	}
-	if cached := gjson.Get(payload, "usage.prompt_tokens_details.cached_tokens"); cached.Exists() {
-		u.CacheReadInputTokens = int(cached.Int())
+	u, ok := openAIUsageFromGJSON(usageResult)
+	if !ok {
+		return nil
 	}
 	return &u
 }
@@ -599,20 +504,9 @@ func (s *OpenAIGatewayService) bufferRawChatCompletions(
 		return nil, fmt.Errorf("read upstream body: %w", err)
 	}
 
-	var ccResp apicompat.ChatCompletionsResponse
 	var usage OpenAIUsage
-	var respServiceTier string
-	if err := json.Unmarshal(respBody, &ccResp); err == nil {
-		respServiceTier = ccResp.ServiceTier
-		if ccResp.Usage != nil {
-			usage = OpenAIUsage{
-				InputTokens:  ccResp.Usage.PromptTokens,
-				OutputTokens: ccResp.Usage.CompletionTokens,
-			}
-			if ccResp.Usage.PromptTokensDetails != nil {
-				usage.CacheReadInputTokens = ccResp.Usage.PromptTokensDetails.CachedTokens
-			}
-		}
+	if parsedUsage, ok := extractOpenAIUsageFromJSONBytes(respBody); ok {
+		usage = parsedUsage
 	}
 
 	if s.responseHeaderFilter != nil {
@@ -633,7 +527,7 @@ func (s *OpenAIGatewayService) bufferRawChatCompletions(
 		BillingModel:    billingModel,
 		UpstreamModel:   upstreamModel,
 		ReasoningEffort: reasoningEffort,
-		ServiceTier:     preferResponseServiceTier(respServiceTier, serviceTier),
+		ServiceTier:     preferResponseServiceTier(usage.ServiceTier, serviceTier),
 		Stream:          false,
 		Duration:        time.Since(startTime),
 	}, nil
