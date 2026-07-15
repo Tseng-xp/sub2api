@@ -2,6 +2,20 @@
 set -eu
 
 remote_name="${1:-}"
+remote_url="${2:-}"
+
+if [ "$remote_name" = "upstream" ]; then
+  echo "Blocked: pushing to the upstream remote is forbidden; push only to origin." >&2
+  exit 1
+fi
+
+case "$remote_url" in
+  *github.com:Wei-Shaw/sub2api.git|*github.com/Wei-Shaw/sub2api.git)
+    echo "Blocked: pushing to the upstream repository is forbidden; push only to origin." >&2
+    exit 1
+    ;;
+esac
+
 if command -v python >/dev/null 2>&1; then
   exec python tools/check_secrets.py --pre-push --remote "$remote_name"
 fi
