@@ -29,8 +29,11 @@
         </template>
         <template #cell-price="{ value, row }">
           <div class="text-sm">
-            <span class="font-medium text-gray-900 dark:text-white">{{ usd(value) }}</span>
-            <span v-if="row.original_price" class="ml-1 text-xs text-gray-400 line-through">{{ usd(row.original_price) }}</span>
+            <span v-if="row.currency" class="font-medium text-gray-900 dark:text-white">${{ (value ?? 0).toFixed(2) }}</span>
+            <span v-else class="font-medium text-gray-900 dark:text-white">{{ usd(value ?? 0) }}</span>
+            <span v-if="row.currency" class="ml-1 text-xs text-gray-400">{{ row.currency }}</span>
+            <span v-if="row.original_price && row.currency" class="ml-1 text-xs text-gray-400 line-through">${{ row.original_price.toFixed(2) }}</span>
+            <span v-else-if="row.original_price" class="ml-1 text-xs text-gray-400 line-through">{{ usd(row.original_price) }}</span>
           </div>
         </template>
         <template #cell-validity_days="{ value, row }">
