@@ -122,6 +122,16 @@ func TestForwardAsRawChatCompletions_ForcesStreamUsageUpstreamAndPassesUsageDown
 	require.Contains(t, rec.Body.String(), "data: [DONE]")
 }
 
+func TestExtractCCStreamUsage_CapturesDeepSeekCacheHitTokens(t *testing.T) {
+	t.Parallel()
+
+	usage := extractCCStreamUsage(`{"id":"chatcmpl_deepseek","choices":[],"usage":{"prompt_tokens":20,"completion_tokens":2,"prompt_cache_hit_tokens":12,"prompt_cache_miss_tokens":8}}`)
+	require.NotNil(t, usage)
+	require.Equal(t, 20, usage.InputTokens)
+	require.Equal(t, 2, usage.OutputTokens)
+	require.Equal(t, 12, usage.CacheReadInputTokens)
+}
+
 func TestForwardAsRawChatCompletions_EstimatesUsageWhenUpstreamOmitsStreamUsage(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

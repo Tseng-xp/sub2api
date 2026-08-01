@@ -1089,6 +1089,8 @@ func openAICacheReadTokensFromUsage(value gjson.Result) int {
 	}
 
 	return firstPositiveGJSONInt(
+		// DeepSeek reports implicit context-cache hits with this top-level field.
+		value.Get("prompt_cache_hit_tokens"),
 		value.Get("cache_read_input_tokens"),
 		value.Get("cache_read_tokens"),
 		value.Get("cached_tokens"),
