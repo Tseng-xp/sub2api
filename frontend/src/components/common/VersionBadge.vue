@@ -859,7 +859,6 @@ async function handleRestart() {
     // Service will restart, page will reload automatically or show disconnected
   } catch (error) {
     // Expected - connection will be lost during restart
-    console.log('Service restarting...')
   }
 
   // Start countdown

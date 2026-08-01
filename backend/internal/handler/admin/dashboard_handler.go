@@ -175,18 +175,6 @@ func (h *DashboardHandler) BackfillAggregation(c *gin.Context) {
 	})
 }
 
-// GetRealtimeMetrics handles getting real-time system metrics
-// GET /api/v1/admin/dashboard/realtime
-func (h *DashboardHandler) GetRealtimeMetrics(c *gin.Context) {
-	// Return mock data for now
-	response.Success(c, gin.H{
-		"active_requests":       0,
-		"requests_per_minute":   0,
-		"average_response_time": 0,
-		"error_rate":            0.0,
-	})
-}
-
 // GetUsageTrend handles getting usage trend data
 // GET /api/v1/admin/dashboard/trend
 // Query params: start_date, end_date (YYYY-MM-DD), granularity (day/hour), user_id, api_key_id, model, account_id, group_id, request_type, stream, billing_type

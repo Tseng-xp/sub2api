@@ -204,10 +204,6 @@ func (s *stubAdminService) GetUserAPIKeys(ctx context.Context, userID int64, pag
 	return s.apiKeys, int64(len(s.apiKeys)), nil
 }
 
-func (s *stubAdminService) GetUserUsageStats(ctx context.Context, userID int64, period string) (any, error) {
-	return map[string]any{"user_id": userID}, nil
-}
-
 func (s *stubAdminService) GetUserRPMStatus(ctx context.Context, userID int64) (*service.UserRPMStatus, error) {
 	user, err := s.GetUser(ctx, userID)
 	if err != nil {
@@ -457,11 +453,6 @@ func (s *stubAdminService) UpdateAccountExtra(ctx context.Context, id int64, upd
 
 func (s *stubAdminService) DeleteAccount(ctx context.Context, id int64) error {
 	return nil
-}
-
-func (s *stubAdminService) RefreshAccountCredentials(ctx context.Context, id int64) (*service.Account, error) {
-	account := service.Account{ID: id, Name: "account", Status: service.StatusActive}
-	return &account, nil
 }
 
 func (s *stubAdminService) ClearAccountError(ctx context.Context, id int64) (*service.Account, error) {

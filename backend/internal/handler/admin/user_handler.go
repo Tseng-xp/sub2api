@@ -438,26 +438,6 @@ func (h *UserHandler) GetUserAPIKeys(c *gin.Context) {
 	response.Paginated(c, out, total, page, pageSize)
 }
 
-// GetUserUsage handles getting user's usage statistics
-// GET /api/v1/admin/users/:id/usage
-func (h *UserHandler) GetUserUsage(c *gin.Context) {
-	userID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "Invalid user ID")
-		return
-	}
-
-	period := c.DefaultQuery("period", "month")
-
-	stats, err := h.adminService.GetUserUsageStats(c.Request.Context(), userID, period)
-	if err != nil {
-		response.ErrorFrom(c, err)
-		return
-	}
-
-	response.Success(c, stats)
-}
-
 // GetBalanceHistory handles getting user's balance/concurrency change history
 // GET /api/v1/admin/users/:id/balance-history
 // Query params:

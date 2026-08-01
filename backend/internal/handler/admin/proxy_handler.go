@@ -284,26 +284,6 @@ func (h *ProxyHandler) CheckQuality(c *gin.Context) {
 	response.Success(c, result)
 }
 
-// GetStats handles getting proxy statistics
-// GET /api/v1/admin/proxies/:id/stats
-func (h *ProxyHandler) GetStats(c *gin.Context) {
-	proxyID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "Invalid proxy ID")
-		return
-	}
-
-	// Return mock data for now
-	_ = proxyID
-	response.Success(c, gin.H{
-		"total_accounts":  0,
-		"active_accounts": 0,
-		"total_requests":  0,
-		"success_rate":    100.0,
-		"average_latency": 0,
-	})
-}
-
 // GetProxyAccounts handles getting accounts using a proxy
 // GET /api/v1/admin/proxies/:id/accounts
 func (h *ProxyHandler) GetProxyAccounts(c *gin.Context) {
