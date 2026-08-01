@@ -29,11 +29,11 @@
         </template>
         <template #cell-price="{ value, row }">
           <div class="text-sm">
-            <span v-if="row.currency" class="font-medium text-gray-900 dark:text-white">${{ (value ?? 0).toFixed(2) }}</span>
-            <span v-else class="font-medium text-gray-900 dark:text-white">{{ usd(value ?? 0) }}</span>
+            <span v-if="row.currency" class="font-medium text-gray-900 dark:text-white">{{ planCurrencySymbol(row.currency) }}{{ (value ?? 0).toFixed(2) }}</span>
+            <span v-else class="font-medium text-gray-900 dark:text-white">${{ (value ?? 0).toFixed(2) }}</span>
             <span v-if="row.currency" class="ml-1 text-xs text-gray-400">{{ row.currency }}</span>
-            <span v-if="row.original_price && row.currency" class="ml-1 text-xs text-gray-400 line-through">${{ row.original_price.toFixed(2) }}</span>
-            <span v-else-if="row.original_price" class="ml-1 text-xs text-gray-400 line-through">{{ usd(row.original_price) }}</span>
+            <span v-if="row.original_price && row.currency" class="ml-1 text-xs text-gray-400 line-through">{{ planCurrencySymbol(row.currency) }}{{ row.original_price.toFixed(2) }}</span>
+            <span v-else-if="row.original_price" class="ml-1 text-xs text-gray-400 line-through">${{ row.original_price.toFixed(2) }}</span>
           </div>
         </template>
         <template #cell-validity_days="{ value, row }">
@@ -80,7 +80,6 @@
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
-import { useCurrencyStore } from '@/stores/currency'
 import { adminPaymentAPI } from '@/api/admin/payment'
 import type { AdminPaymentConfig } from '@/api/admin/payment'
 import { extractI18nErrorMessage } from '@/utils/apiError'
@@ -94,14 +93,14 @@ import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
 import GroupBadge from '@/components/common/GroupBadge.vue'
 import PlanEditDialog from './PlanEditDialog.vue'
+import { currencySymbol } from '@/components/payment/currency'
 import { platformTextClass } from '@/utils/platformColors'
 
 const { t } = useI18n()
-const currencyStore = useCurrencyStore()
 const appStore = useAppStore()
 
-function usd(value: number | null | undefined): string {
-  return currencyStore.formatAmount(value)
+function planCurrencySymbol(currency?: string): string {
+  return currencySymbol(currency || 'USD')
 }
 
 // ==================== Groups ====================
