@@ -936,9 +936,10 @@ func TestOpenAIGatewayServiceRecordUsage_GeneratesRequestIDWhenAllSourcesMissing
 	require.Equal(t, billingRepo.lastCmd.RequestID, usageRepo.lastLog.RequestID)
 }
 
-func TestOpenAIGatewayServiceRecordUsage_BillingErrorStillWritesUsageLog(t *testing.T) {
+func TestOpenAIGatewayServiceRecordUsage_BillingErrorWritesUnsettledUsageLog(t *testing.T) {
 	usageRepo := &openAIRecordUsageLogRepoStub{}
-	billingRepo := &openAIRecordUsageBillingRepoStub{err: errors.New("billing tx failed")}
+	billingErr := errors.New("billing tx failed")
+	billingRepo := &openAIRecordUsageBillingRepoStub{err: billingErr}
 	userRepo := &openAIRecordUsageUserRepoStub{}
 	subRepo := &openAIRecordUsageSubRepoStub{}
 	svc := newOpenAIRecordUsageServiceWithBillingRepoForTest(usageRepo, billingRepo, userRepo, subRepo, nil)
@@ -958,12 +959,19 @@ func TestOpenAIGatewayServiceRecordUsage_BillingErrorStillWritesUsageLog(t *test
 		Account: &Account{ID: 30048},
 	})
 
-	require.Error(t, err)
+	require.ErrorIs(t, err, billingErr)
 	// 瞬时性计费错误会有界重试（applyUsageBillingWithRetry，最多 3 次），抵御 DB 抖动导致的漏计费；
 	// 非终态错误（此处为通用 "billing tx failed"）会重试到上限。Apply 幂等去重，重试不会重复扣费。
 	require.Equal(t, 3, billingRepo.calls)
 	// 计费失败也应写审计日志（幂等），便于对账"已服务未计费"的请求。
 	require.Equal(t, 1, usageRepo.calls)
+	require.NotNil(t, usageRepo.lastLog)
+	require.Equal(t, 8, usageRepo.lastLog.InputTokens)
+	require.Equal(t, 4, usageRepo.lastLog.OutputTokens)
+	require.Greater(t, usageRepo.lastLog.InputCost, 0.0)
+	require.Greater(t, usageRepo.lastLog.OutputCost, 0.0)
+	require.Greater(t, usageRepo.lastLog.TotalCost, 0.0)
+	require.Zero(t, usageRepo.lastLog.ActualCost)
 }
 
 func TestOpenAIGatewayServiceRecordUsage_UpdatesAPIKeyQuotaWhenConfigured(t *testing.T) {
