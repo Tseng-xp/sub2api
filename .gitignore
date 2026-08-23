@@ -185,3 +185,7 @@ test_latest_pull.py
 test_ghcr_pull.py
 frontend/build_check.js
 frontend/build_error.log
+.codegraph/
+
+# Vitest / Vite cache at repo root
+.vite/
