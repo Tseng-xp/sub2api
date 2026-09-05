@@ -1,5 +1,6 @@
 import { mount } from '@vue/test-utils'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
 
 import type { UserMonitorView } from '@/api/channelMonitor'
 import MonitorCard from '../monitor/MonitorCard.vue'
@@ -56,6 +57,10 @@ function mountCard(item: UserMonitorView) {
 }
 
 describe('MonitorCard quota snapshot visibility', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+  })
+
   it('hides the quota block when the system switch is off even if data exists', () => {
     isQuotaVisible.mockReturnValue(false)
     const wrapper = mountCard(
