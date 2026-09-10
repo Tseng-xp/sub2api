@@ -91,7 +91,7 @@ func (r *ModelPricingResolver) Resolve(ctx context.Context, input PricingInput) 
 			if mode == "" {
 				mode = BillingModeToken
 			}
-			if mode == BillingModePerRequest || mode == BillingModeImage || mode == BillingModeVideo {
+			if mode == BillingModePerRequest || mode == BillingModeImage || mode == BillingModeVideo || mode == BillingModeVideoTokenTiered {
 				resolved := &ResolvedPricing{
 					Mode:           mode,
 					Source:         PricingSourceChannel,
@@ -133,7 +133,7 @@ func (r *ModelPricingResolver) resolveConfiguredPricing(config *ChannelModelPric
 		mode = BillingModeToken
 	}
 	resolved := &ResolvedPricing{Mode: mode, Source: source, channelPricing: config}
-	if mode == BillingModePerRequest || mode == BillingModeImage || mode == BillingModeVideo {
+	if mode == BillingModePerRequest || mode == BillingModeImage || mode == BillingModeVideo || mode == BillingModeVideoTokenTiered {
 		r.applyRequestTierOverrides(config, resolved)
 		return resolved
 	}
@@ -218,7 +218,7 @@ func (r *ModelPricingResolver) applyChannelOverrides(ctx context.Context, groupI
 	switch resolved.Mode {
 	case BillingModeToken:
 		r.applyTokenOverrides(chPricing, resolved)
-	case BillingModePerRequest, BillingModeImage, BillingModeVideo:
+	case BillingModePerRequest, BillingModeImage, BillingModeVideo, BillingModeVideoTokenTiered:
 		r.applyRequestTierOverrides(chPricing, resolved)
 	}
 }
@@ -384,10 +384,21 @@ func intervalToModelPricing(iv *PricingInterval, base *ModelPricing, chPricing *
 
 // GetRequestTierPrice 根据层级标签获取按次价格
 func (r *ModelPricingResolver) GetRequestTierPrice(resolved *ResolvedPricing, tierLabel string) float64 {
-	for _, tier := range resolved.RequestTiers {
-		if tier.TierLabel == tierLabel && tier.PerRequestPrice != nil {
-			return *tier.PerRequestPrice
+	find := func(label string) float64 {
+		for _, tier := range resolved.RequestTiers {
+			if strings.EqualFold(strings.TrimSpace(tier.TierLabel), strings.TrimSpace(label)) && tier.PerRequestPrice != nil {
+				return *tier.PerRequestPrice
+			}
 		}
+		return 0
+	}
+	if price := find(tierLabel); price != 0 {
+		return price
+	}
+	// Video input-mode tiers fall back to the legacy resolution-only tier so
+	// existing 480p/720p/1080p channel configurations remain compatible.
+	if fallback := videoPriceTierFallbackResolution(tierLabel); fallback != "" {
+		return find(fallback)
 	}
 	return 0
 }

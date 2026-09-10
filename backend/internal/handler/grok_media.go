@@ -426,12 +426,13 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 			// model/duration/resolution so status can still price if upstream omits them.
 			// Retry once: missing pending causes silent underpricing (status omits resolution).
 			pending := service.GrokVideoPendingBilling{
-				Model:                requestModel,
-				BillingModel:         firstNonEmptyString(result.BillingModel, requestModel),
-				UpstreamModel:        result.UpstreamModel,
-				VideoResolution:      result.VideoResolution,
-				VideoDurationSeconds: result.VideoDurationSeconds,
-				OriginalModel:        clientRequestedModel(c, requestModel),
+				Model:                  requestModel,
+				BillingModel:           firstNonEmptyString(result.BillingModel, requestModel),
+				UpstreamModel:          result.UpstreamModel,
+				VideoResolution:        result.VideoResolution,
+				VideoDurationSeconds:   result.VideoDurationSeconds,
+				VideoHasReferenceInput: requestInfo.HasReferenceInput(),
+				OriginalModel:          clientRequestedModel(c, requestModel),
 				// Wall-clock start for usage duration_ms: create accepted → first done discovery.
 				CreatedAt: videoCreateStartedAt,
 			}
@@ -590,8 +591,10 @@ func prepareGrokVideoCompletionBilling(
 		if strings.TrimSpace(merged.Model) == "" {
 			merged.Model = firstNonEmptyString(pending.BillingModel, pending.Model, pending.OriginalModel)
 		}
-		if strings.TrimSpace(merged.BillingModel) == "" {
-			merged.BillingModel = firstNonEmptyString(pending.BillingModel, pending.Model, merged.Model)
+		if billingModel := firstNonEmptyString(pending.BillingModel, pending.Model); billingModel != "" {
+			// The async status payload may report the upstream mapped model. Billing
+			// must remain anchored to the client/channel model captured at creation.
+			merged.BillingModel = billingModel
 		}
 		if strings.TrimSpace(merged.UpstreamModel) == "" {
 			merged.UpstreamModel = pending.UpstreamModel
@@ -603,6 +606,7 @@ func prepareGrokVideoCompletionBilling(
 		if merged.VideoDurationSeconds <= 0 {
 			merged.VideoDurationSeconds = pending.VideoDurationSeconds
 		}
+		merged.VideoHasReferenceInput = pending.VideoHasReferenceInput
 		if strings.TrimSpace(merged.ResponseID) == "" {
 			merged.ResponseID = taskRequestID
 		}
@@ -615,7 +619,7 @@ func prepareGrokVideoCompletionBilling(
 	}
 	// Always force durable task id so usage_billing_dedup survives multi-poll +
 	// context-local request ids (do not prefer empty-only fill).
-	merged.RequestID = service.StableGrokVideoBillingRequestID(firstNonEmptyString(merged.ResponseID, taskRequestID))
+	merged.RequestID = service.StableGrokVideoBillingRequestID(firstNonEmptyString(taskRequestID, merged.ResponseID))
 	merged.ResponseID = firstNonEmptyString(merged.ResponseID, taskRequestID)
 	merged.VideoCount = 1
 	// Pure video: do not keep legacy ImageCount (avoids image-path heuristics).
@@ -678,7 +682,7 @@ func recordGrokMediaUsage(
 	videoTaskID := ""
 	if result != nil && result.VideoCount > 0 {
 		videoTaskID = strings.TrimSpace(firstNonEmptyString(requestID, result.ResponseID))
-		if stable := service.StableGrokVideoBillingRequestID(firstNonEmptyString(result.ResponseID, requestID)); stable != "" {
+		if stable := service.StableGrokVideoBillingRequestID(firstNonEmptyString(requestID, result.ResponseID)); stable != "" {
 			result.RequestID = stable
 		}
 		// Prefer task id hash for payload fingerprint stability across status/content.

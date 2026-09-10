@@ -195,10 +195,16 @@ func (g *Group) GetVideoPrice(resolution string) *float64 {
 
 // GetVideoPriceForModel prefers VideoModelPrices for the model family, then flat columns.
 func (g *Group) GetVideoPriceForModel(model, resolution string) *float64 {
+	return g.GetVideoPriceForModelInput(model, resolution, false)
+}
+
+// GetVideoPriceForModelInput prefers an input-mode-specific model price, then
+// the legacy resolution-only model price and flat group columns.
+func (g *Group) GetVideoPriceForModelInput(model, resolution string, hasReferenceInput bool) *float64 {
 	if g == nil {
 		return nil
 	}
-	if price := LookupVideoModelPrice(g.VideoModelPrices, model, resolution); price != nil {
+	if price := LookupVideoModelPriceForInput(g.VideoModelPrices, model, resolution, hasReferenceInput); price != nil {
 		return price
 	}
 	return g.GetVideoPrice(resolution)

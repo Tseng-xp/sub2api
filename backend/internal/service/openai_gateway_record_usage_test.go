@@ -2648,6 +2648,80 @@ func TestOpenAIGatewayServiceRecordUsage_GrokVideoWithTokenChannelPricingKeepsVi
 	require.Equal(t, 5, *usageRepo.lastLog.VideoDurationSeconds)
 }
 
+func TestOpenAIGatewayServiceRecordUsage_TieredVideoTokenPricingUsesActualCompletionTokens(t *testing.T) {
+	groupID := int64(133)
+	const model = "custom-video-model"
+	usageRepo := &openAIRecordUsageLogRepoStub{inserted: true}
+	svc := newOpenAIRecordUsageServiceForTest(usageRepo, &openAIRecordUsageUserRepoStub{}, &openAIRecordUsageSubRepoStub{}, nil)
+	svc.resolver = newOpenAIVideoTokenTieredPricingResolverForTest(t, groupID, model, map[string]float64{
+		"1080p_with_ref": 5,
+		"1080p_no_ref":   8,
+	})
+
+	err := svc.RecordUsage(context.Background(), &OpenAIRecordUsageInput{
+		Result: &OpenAIForwardResult{
+			RequestID:              "video-token-task-1",
+			ResponseID:             "video-token-task-1",
+			Model:                  model,
+			BillingModel:           model,
+			VideoCount:             1,
+			VideoResolution:        VideoBillingResolution1080P,
+			VideoDurationSeconds:   10,
+			VideoHasReferenceInput: true,
+			Usage:                  OpenAIUsage{OutputTokens: 250000},
+			Duration:               time.Second,
+		},
+		APIKey: &APIKey{
+			ID:      10133,
+			GroupID: i64p(groupID),
+			Group:   &Group{ID: groupID, Platform: PlatformGrok, RateMultiplier: 1},
+		},
+		User:    &User{ID: 20133},
+		Account: &Account{ID: 30133, Platform: PlatformGrok},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, usageRepo.lastLog)
+	require.Equal(t, 250000, usageRepo.lastLog.OutputTokens)
+	require.InDelta(t, 1.25, usageRepo.lastLog.TotalCost, 1e-12)
+	require.InDelta(t, 1.25, usageRepo.lastLog.ActualCost, 1e-12)
+	require.NotNil(t, usageRepo.lastLog.BillingMode)
+	require.Equal(t, string(BillingModeVideoTokenTiered), *usageRepo.lastLog.BillingMode)
+}
+
+func TestOpenAIGatewayServiceRecordUsage_TieredVideoTokenPricingRejectsMissingUsage(t *testing.T) {
+	groupID := int64(134)
+	const model = "custom-video-model"
+	usageRepo := &openAIRecordUsageLogRepoStub{inserted: true}
+	svc := newOpenAIRecordUsageServiceForTest(usageRepo, &openAIRecordUsageUserRepoStub{}, &openAIRecordUsageSubRepoStub{}, nil)
+	svc.resolver = newOpenAIVideoTokenTieredPricingResolverForTest(t, groupID, model, map[string]float64{
+		"720p_no_ref": 10,
+	})
+
+	err := svc.RecordUsage(context.Background(), &OpenAIRecordUsageInput{
+		Result: &OpenAIForwardResult{
+			RequestID:            "video-token-task-no-usage",
+			ResponseID:           "video-token-task-no-usage",
+			Model:                model,
+			BillingModel:         model,
+			VideoCount:           1,
+			VideoResolution:      VideoBillingResolution720P,
+			VideoDurationSeconds: 10,
+			Duration:             time.Second,
+		},
+		APIKey: &APIKey{
+			ID:      10134,
+			GroupID: i64p(groupID),
+			Group:   &Group{ID: groupID, Platform: PlatformGrok, RateMultiplier: 1},
+		},
+		User:    &User{ID: 20134},
+		Account: &Account{ID: 30134, Platform: PlatformGrok},
+	})
+
+	require.ErrorContains(t, err, "video token usage missing")
+	require.Nil(t, usageRepo.lastLog)
+}
+
 func TestOpenAIGatewayServiceRecordUsage_ChannelImageBillingUsesImageCountAndSharedMultiplier(t *testing.T) {
 	groupID := int64(123)
 	usageRepo := &openAIRecordUsageLogRepoStub{inserted: true}
@@ -2730,6 +2804,26 @@ func newOpenAIImageChannelPricingResolverForTest(t *testing.T, groupID int64, mo
 	cache.pricingByGroupModel[channelModelKey{groupID: groupID, model: model}] = &ChannelModelPricing{
 		BillingMode:     BillingModeImage,
 		PerRequestPrice: &price,
+	}
+	cache.channelByGroupID[groupID] = &Channel{ID: groupID, Status: StatusActive}
+	cache.groupPlatform[groupID] = ""
+	cache.loadedAt = time.Now()
+	cs := &ChannelService{}
+	cs.cache.Store(cache)
+	return NewModelPricingResolver(cs, NewBillingService(&config.Config{}, nil))
+}
+
+func newOpenAIVideoTokenTieredPricingResolverForTest(t *testing.T, groupID int64, model string, tiers map[string]float64) *ModelPricingResolver {
+	t.Helper()
+	intervals := make([]PricingInterval, 0, len(tiers))
+	for label, price := range tiers {
+		price := price
+		intervals = append(intervals, PricingInterval{TierLabel: label, PerRequestPrice: &price})
+	}
+	cache := newEmptyChannelCache()
+	cache.pricingByGroupModel[channelModelKey{groupID: groupID, model: model}] = &ChannelModelPricing{
+		BillingMode: BillingModeVideoTokenTiered,
+		Intervals:   intervals,
 	}
 	cache.channelByGroupID[groupID] = &Channel{ID: groupID, Status: StatusActive}
 	cache.groupPlatform[groupID] = ""

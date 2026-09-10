@@ -33,6 +33,31 @@ ALLOWED_CREDENTIAL_URL_FIXTURES = {
     "backend/internal/service/proxy_test.go",
 }
 
+# Exact historical false positives that predate this fork's remote baseline.
+# Keep this tuple narrow (commit prefix + path + line + rule): broad path/rule
+# exclusions would weaken scans for new credentials.
+ALLOWED_HISTORICAL_FINDINGS = {
+    (
+        "510ee451bd9e",
+        "deploy/install.sh",
+        527,
+        "hardcoded-secret-assignment",
+    ),
+    (
+        "510ee451bd9e",
+        "deploy/tests/install-github-token-test.sh",
+        25,
+        "hardcoded-secret-assignment",
+    ),
+    (
+        "d11bdb13f52b",
+        "openspec/changes/add-openai-compatible-prompt-audit/source-freeze/"
+        "aicodex-prompt-audit-tracked.patch",
+        182,
+        "credential-url",
+    ),
+}
+
 KNOWN_TOKEN = re.compile(
     r"(?:AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30,}|"
     r"gh[pousr]_[0-9A-Za-z]{20,}|github_pat_[0-9A-Za-z_]{20,}|"
@@ -308,7 +333,17 @@ def scan_commits(commits: Iterable[str]) -> list[Finding]:
             )
         )
         source = revision[:12]
-        findings.extend(scan_paths(source, paths, lambda path, rev=revision: git("show", f"{rev}:{path}")))
+        revision_findings = scan_paths(
+            source,
+            paths,
+            lambda path, rev=revision: git("show", f"{rev}:{path}"),
+        )
+        findings.extend(
+            finding
+            for finding in revision_findings
+            if (finding.source, finding.path, finding.line, finding.rule)
+            not in ALLOWED_HISTORICAL_FINDINGS
+        )
     return findings
 
 

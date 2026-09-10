@@ -177,6 +177,23 @@ func TestGetRequestTierPrice(t *testing.T) {
 	require.InDelta(t, 0.0, r.GetRequestTierPrice(resolved, "4K"), 1e-12)
 }
 
+func TestGetRequestTierPriceUsesVideoInputModeAndLegacyFallback(t *testing.T) {
+	bs := newTestBillingServiceForResolver()
+	r := NewModelPricingResolver(&ChannelService{}, bs)
+	resolved := &ResolvedPricing{
+		Mode: BillingModeVideoTokenTiered,
+		RequestTiers: []PricingInterval{
+			{TierLabel: "1080p_with_ref", PerRequestPrice: testPtrFloat64(1.25)},
+			{TierLabel: "1080p_no_ref", PerRequestPrice: testPtrFloat64(2.75)},
+			{TierLabel: "720p", PerRequestPrice: testPtrFloat64(0.2)},
+		},
+	}
+
+	require.InDelta(t, 1.25, r.GetRequestTierPrice(resolved, VideoPriceTierForInput("1080p", true)), 1e-12)
+	require.InDelta(t, 2.75, r.GetRequestTierPrice(resolved, VideoPriceTierForInput("1080p", false)), 1e-12)
+	require.InDelta(t, 0.2, r.GetRequestTierPrice(resolved, VideoPriceTierForInput("720p", true)), 1e-12)
+}
+
 func TestGetRequestTierPriceByContext(t *testing.T) {
 	bs := newTestBillingServiceForResolver()
 	r := NewModelPricingResolver(&ChannelService{}, bs)

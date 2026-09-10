@@ -1292,7 +1292,7 @@ type CostInput struct {
 	Tokens                    UsageTokens
 	RequestCount              int     // 按次计费时使用
 	UsageUnits                float64 // 音频等连续计量单位（分钟/小时/百万字符）
-	SizeTier                  string  // 按次/图片模式的层级标签（"1K","2K","4K","HD" 等）
+	SizeTier                  string  // 按次/媒体模式层级（如 "1K"、"1080p_with_ref"）
 	RateMultiplier            float64
 	PricingAt                 time.Time             // 渠道分时定价使用的计费时刻
 	ServiceTier               string                // "priority","flex","" 等
@@ -1343,7 +1343,7 @@ func (s *BillingService) CalculateCostUnified(input CostInput) (*CostBreakdown, 
 	var breakdown *CostBreakdown
 	var err error
 	switch resolved.Mode {
-	case BillingModePerRequest, BillingModeImage, BillingModeVideo:
+	case BillingModePerRequest, BillingModeImage, BillingModeVideo, BillingModeVideoTokenTiered:
 		breakdown, err = s.calculatePerRequestCost(resolved, input)
 	default: // BillingModeToken
 		breakdown, err = s.calculateTokenCost(resolved, input)
@@ -2026,13 +2026,18 @@ func (s *BillingService) CalculateImageCost(model string, imageSize string, imag
 // groupConfig: 分组配置的每秒价格（可能为 nil，表示使用默认值）
 // rateMultiplier: 费率倍数
 func (s *BillingService) CalculateVideoCost(model string, resolution string, videoCount int, durationSeconds int, groupConfig *VideoPriceConfig, rateMultiplier float64) *CostBreakdown {
+	return s.CalculateVideoCostForInput(model, resolution, videoCount, durationSeconds, false, groupConfig, rateMultiplier)
+}
+
+// CalculateVideoCostForInput applies an optional image/reference-input tier.
+func (s *BillingService) CalculateVideoCostForInput(model string, resolution string, videoCount int, durationSeconds int, hasReferenceInput bool, groupConfig *VideoPriceConfig, rateMultiplier float64) *CostBreakdown {
 	if videoCount <= 0 {
 		return &CostBreakdown{}
 	}
 	resolution = NormalizeVideoBillingResolutionOrDefault(resolution)
 	durationSeconds = NormalizeVideoBillingDurationSecondsOrDefault(durationSeconds)
 
-	perSecondPrice := s.getVideoUnitPrice(model, resolution, groupConfig)
+	perSecondPrice := s.getVideoUnitPriceForInput(model, resolution, hasReferenceInput, groupConfig)
 	totalCost := perSecondPrice * float64(durationSeconds) * float64(videoCount)
 
 	if rateMultiplier < 0 {
@@ -2072,9 +2077,13 @@ func (s *BillingService) getImageUnitPrice(model string, imageSize string, group
 }
 
 func (s *BillingService) getVideoUnitPrice(model string, resolution string, groupConfig *VideoPriceConfig) float64 {
+	return s.getVideoUnitPriceForInput(model, resolution, false, groupConfig)
+}
+
+func (s *BillingService) getVideoUnitPriceForInput(model string, resolution string, hasReferenceInput bool, groupConfig *VideoPriceConfig) float64 {
 	// Order: (a) per-model map (b) flat group video_price_* (c) model-aware code defaults.
 	if groupConfig != nil {
-		if price := LookupVideoModelPrice(groupConfig.ModelPrices, model, resolution); price != nil {
+		if price := LookupVideoModelPriceForInput(groupConfig.ModelPrices, model, resolution, hasReferenceInput); price != nil {
 			return *price
 		}
 		switch NormalizeVideoBillingResolutionOrDefault(resolution) {

@@ -61,6 +61,58 @@ func TestGrokAPIKeyURLPolicyFollowsGlobalSecurityConfig(t *testing.T) {
 	})
 }
 
+func TestBuildGrokMediaURLUsesSeedanceV2ProtocolForConfiguredSupplier(t *testing.T) {
+	account := &Account{
+		Platform: PlatformGrok,
+		Type:     AccountTypeAPIKey,
+		Credentials: map[string]any{
+			"base_url": "https://model.service-inference.ai/v1",
+		},
+	}
+	cfg := &config.Config{}
+
+	createURL, err := buildGrokMediaURL(account, cfg, GrokMediaEndpointVideosGenerations, "")
+	require.NoError(t, err)
+	require.Equal(t, "https://model.service-inference.ai/v2/video/generate", createURL)
+
+	statusURL, err := buildGrokMediaURL(account, cfg, GrokMediaEndpointVideoStatus, "mvt-task 1")
+	require.NoError(t, err)
+	require.Equal(t, "https://model.service-inference.ai/v2/video/tasks/mvt-task%201", statusURL)
+
+	_, err = buildGrokMediaURL(account, cfg, GrokMediaEndpointVideosEdits, "")
+	require.ErrorContains(t, err, "unsupported seedance v2 media endpoint")
+}
+
+func TestBuildGrokMediaURLUsesTencentTokenHubH3Protocol(t *testing.T) {
+	for _, baseURL := range []string{
+		"https://tokenhub.tencentmaas.com",
+		"https://tokenhub.tencentmaas.com/v1",
+		"https://tokenhub-intl.tencentcloudmaas.com/v1/wand/minimax-video-v2/generation",
+	} {
+		account := &Account{
+			Platform: PlatformGrok,
+			Type:     AccountTypeAPIKey,
+			Credentials: map[string]any{
+				"base_url": baseURL,
+			},
+		}
+		cfg := &config.Config{}
+
+		createURL, err := buildGrokMediaURL(account, cfg, GrokMediaEndpointVideosGenerations, "")
+		require.NoError(t, err)
+		parsedCreate, err := xai.ValidateBaseURL(createURL)
+		require.NoError(t, err)
+		require.Contains(t, parsedCreate, "/v1/wand/minimax-video-v2/generation")
+
+		statusURL, err := buildGrokMediaURL(account, cfg, GrokMediaEndpointVideoStatus, "task 1")
+		require.NoError(t, err)
+		require.Contains(t, statusURL, "/v1/wand/minimax-video-v2/tasks/task%201")
+
+		_, err = buildGrokMediaURL(account, cfg, GrokMediaEndpointVideosEdits, "")
+		require.ErrorContains(t, err, "unsupported tencent tokenhub media endpoint")
+	}
+}
+
 func TestGrokAPIKeyURLPolicyAppliesAllowlistAndPrivateHostControls(t *testing.T) {
 	account := &Account{
 		Platform: PlatformGrok,

@@ -583,6 +583,7 @@ export default {
       billingModePerRequest: 'Per Request',
       billingModeImage: 'Per Image',
       billingModeVideo: 'Per Video',
+      billingModeVideoTokenTiered: 'Video Token (Tiered)',
       inputPrice: 'Input',
       outputPrice: 'Output',
       cacheWritePrice: 'Cache Write',
@@ -651,6 +652,7 @@ export default {
       rate: 'Rate',
       unitPerMillion: '$ / 1M tokens',
       perUnitRequest: '/ request',
+      perUnitVideoToken: '/ million video tokens',
       perUnitImage: '/ image',
       perRequest: 'Per request',
       perImage: 'Per image'

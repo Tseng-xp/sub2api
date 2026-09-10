@@ -588,6 +588,7 @@ export default {
       billingModePerRequest: '按次',
       billingModeImage: '按图片',
       billingModeVideo: '按视频',
+      billingModeVideoTokenTiered: '视频 Token（分档）',
       inputPrice: '输入',
       outputPrice: '输出',
       cacheWritePrice: '缓存写入',
@@ -655,6 +656,7 @@ export default {
       rate: '折扣倍率',
       unitPerMillion: '$ / 1M token',
       perUnitRequest: '/ 次',
+      perUnitVideoToken: '/ 百万视频 Token',
       perUnitImage: '/ 张',
       perRequest: '按次计费',
       perImage: '按图片计费'

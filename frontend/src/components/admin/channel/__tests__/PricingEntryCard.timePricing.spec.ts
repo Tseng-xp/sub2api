@@ -86,3 +86,50 @@ describe('PricingEntryCard request multipliers', () => {
     expect(shown.text()).toContain('admin.channels.form.maxReasoningEffortMultiplier')
   })
 })
+
+describe('PricingEntryCard tiered video-token pricing', () => {
+  it('adds editable input-mode tiers without hardcoding a model or price', async () => {
+    const entry = createEntry('video_token_tiered')
+    entry.models = ['custom-video-model']
+    const wrapper = shallowMount(PricingEntryCard, { props: { entry } })
+
+    expect(wrapper.text()).toContain('admin.channels.form.videoTokenTierHint')
+    const addTier = wrapper.findAll('button').find(button =>
+      button.text().includes('admin.channels.form.addTier')
+    )
+    expect(addTier).toBeDefined()
+    await addTier!.trigger('click')
+
+    const firstUpdate = wrapper.emitted('update')?.[0]?.[0] as PricingFormEntry
+    expect(firstUpdate.intervals[0].tier_label).toBe('480p_with_ref')
+    expect(firstUpdate.intervals[0].per_request_price).toBeNull()
+    await wrapper.setProps({ entry: firstUpdate })
+    await addTier!.trigger('click')
+
+    const secondUpdate = wrapper.emitted('update')?.[1]?.[0] as PricingFormEntry
+    expect(secondUpdate.intervals.map(interval => interval.tier_label)).toEqual([
+      '480p_with_ref',
+      '480p_no_ref',
+    ])
+  })
+
+  it('offers Tencent H3 768p and 2k tiers without hardcoded prices', async () => {
+	const entry = createEntry('video_token_tiered')
+	entry.intervals = [
+	  '480p_with_ref', '480p_no_ref', '720p_with_ref', '720p_no_ref',
+	].map((tier_label, sort_order) => ({
+	  min_tokens: 0, max_tokens: null, tier_label,
+	  input_price: null, output_price: null, cache_write_price: null,
+	  cache_write_1h_price: null, cache_read_price: null, per_request_price: null,
+	  input_multiplier: null, output_multiplier: null,
+	  cache_write_multiplier: null, cache_read_multiplier: null, sort_order,
+	}))
+	const wrapper = shallowMount(PricingEntryCard, { props: { entry } })
+	const addTier = wrapper.findAll('button').find(button =>
+	  button.text().includes('admin.channels.form.addTier')
+	)
+	await addTier!.trigger('click')
+	const update = wrapper.emitted('update')?.[0]?.[0] as PricingFormEntry
+	expect(update.intervals.at(-1)?.tier_label).toBe('768p_with_ref')
+  })
+})

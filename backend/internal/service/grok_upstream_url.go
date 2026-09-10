@@ -12,6 +12,102 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/util/urlvalidator"
 )
 
+const seedanceV2MediaHost = "model.service-inference.ai"
+
+var tencentTokenHubMediaHosts = map[string]struct{}{
+	"tokenhub.tencentmaas.com":           {},
+	"tokenhub-intl.tencentcloudmaas.com": {},
+}
+
+// isSeedanceV2MediaBaseURL selects the supplier-specific video adapter by the
+// operator-configured account endpoint. Pricing and model aliases stay in the
+// database; this only chooses the upstream wire protocol.
+func isSeedanceV2MediaBaseURL(raw string) bool {
+	parsed, err := url.Parse(strings.TrimSpace(raw))
+	return err == nil && strings.EqualFold(parsed.Hostname(), seedanceV2MediaHost)
+}
+
+// isTencentTokenHubMediaBaseURL selects Tencent TokenHub's MiniMax H3/H3-Max
+// adapter. TokenHub uses Bearer authentication like Grok API-key accounts, but
+// its asynchronous video endpoints and terminal response shape are different.
+func isTencentTokenHubMediaBaseURL(raw string) bool {
+	parsed, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil {
+		return false
+	}
+	_, ok := tencentTokenHubMediaHosts[strings.ToLower(parsed.Hostname())]
+	return ok
+}
+
+func buildTencentTokenHubMediaURL(baseURL string, endpoint GrokMediaEndpoint, requestID string, validator xai.BaseURLValidator) (string, error) {
+	validated, err := validator(baseURL)
+	if err != nil {
+		return "", fmt.Errorf("invalid base url: %w", err)
+	}
+	parsed, err := url.Parse(validated)
+	if err != nil {
+		return "", fmt.Errorf("invalid base url: %w", err)
+	}
+	// The account URL may be saved as the host, /v1, or the complete create
+	// endpoint. Always rebuild the documented V2 endpoint from the origin.
+	parsed.Path = ""
+	parsed.RawPath = ""
+	switch endpoint {
+	case GrokMediaEndpointVideosGenerations:
+		parsed.Path = "/v1/wand/minimax-video-v2/generation"
+	case GrokMediaEndpointVideoStatus:
+		requestID = strings.TrimSpace(requestID)
+		if requestID == "" {
+			return "", fmt.Errorf("tencent tokenhub video task id is required")
+		}
+		parsed.Path = "/v1/wand/minimax-video-v2/tasks/" + url.PathEscape(requestID)
+	case GrokMediaEndpointVideoContent:
+		return "", fmt.Errorf("tencent tokenhub video content is available only from the signed task output URL")
+	default:
+		return "", fmt.Errorf("unsupported tencent tokenhub media endpoint: %s", endpoint)
+	}
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+	return parsed.String(), nil
+}
+
+func buildSeedanceV2MediaURL(baseURL string, endpoint GrokMediaEndpoint, requestID string, validator xai.BaseURLValidator) (string, error) {
+	validated, err := validator(baseURL)
+	if err != nil {
+		return "", fmt.Errorf("invalid base url: %w", err)
+	}
+	parsed, err := url.Parse(validated)
+	if err != nil {
+		return "", fmt.Errorf("invalid base url: %w", err)
+	}
+	prefix := strings.TrimRight(parsed.EscapedPath(), "/")
+	for _, suffix := range []string{"/v1", "/v2"} {
+		if strings.HasSuffix(strings.ToLower(prefix), suffix) {
+			prefix = prefix[:len(prefix)-len(suffix)]
+			break
+		}
+	}
+	switch endpoint {
+	case GrokMediaEndpointVideosGenerations:
+		parsed.Path = prefix + "/v2/video/generate"
+		parsed.RawPath = ""
+	case GrokMediaEndpointVideoStatus:
+		requestID = strings.TrimSpace(requestID)
+		if requestID == "" {
+			return "", fmt.Errorf("seedance video task id is required")
+		}
+		parsed.Path = prefix + "/v2/video/tasks/" + url.PathEscape(requestID)
+		parsed.RawPath = ""
+	case GrokMediaEndpointVideoContent:
+		return "", fmt.Errorf("seedance video content is available only from the signed task output URL")
+	default:
+		return "", fmt.Errorf("unsupported seedance v2 media endpoint: %s", endpoint)
+	}
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+	return parsed.String(), nil
+}
+
 func grokBaseURLValidator(account *Account, cfg *config.Config) (xai.BaseURLValidator, error) {
 	if account == nil || !account.IsGrok() {
 		return nil, fmt.Errorf("grok account is required")
@@ -117,6 +213,12 @@ func buildGrokMediaURL(account *Account, cfg *config.Config, endpoint GrokMediaE
 		return "", err
 	}
 	baseURL := account.GetGrokMediaBaseURL()
+	if isSeedanceV2MediaBaseURL(baseURL) {
+		return buildSeedanceV2MediaURL(baseURL, endpoint, requestID, validator)
+	}
+	if isTencentTokenHubMediaBaseURL(baseURL) {
+		return buildTencentTokenHubMediaURL(baseURL, endpoint, requestID, validator)
+	}
 	switch endpoint {
 	case GrokMediaEndpointImagesGenerations:
 		return xai.BuildImagesGenerationsURLWithValidator(baseURL, validator)

@@ -64,6 +64,30 @@ func TestNormalizeVideoModelPricesDropsUnknownResolutions(t *testing.T) {
 	}))
 }
 
+func TestVideoPriceUsesReferenceInputTier(t *testing.T) {
+	t.Parallel()
+	const model = "custom-video-model"
+	prices := NormalizeVideoModelPrices(map[string]map[string]float64{
+		model: {
+			"1080p_with_ref": 0.31,
+			"1080p_no_ref":   0.52,
+		},
+	})
+	reference := LookupVideoModelPriceForInput(prices, model, "1080p", true)
+	text := LookupVideoModelPriceForInput(prices, model, "1080p", false)
+	require.NotNil(t, reference)
+	require.NotNil(t, text)
+	require.InDelta(t, 0.31, *reference, 1e-12)
+	require.InDelta(t, 0.52, *text, 1e-12)
+	require.Nil(t, LookupVideoModelPrice(prices, model, "1080p"))
+
+	service := &BillingService{}
+	refCost := service.CalculateVideoCostForInput(model, "1080p", 1, 2, true, &VideoPriceConfig{ModelPrices: prices}, 1)
+	textCost := service.CalculateVideoCostForInput(model, "1080p", 1, 2, false, &VideoPriceConfig{ModelPrices: prices}, 1)
+	require.InDelta(t, 0.62, refCost.ActualCost, 1e-12)
+	require.InDelta(t, 1.04, textCost.ActualCost, 1e-12)
+}
+
 func TestNormalizeVideoModelPricesIsDeterministicAcrossAliasConflicts(t *testing.T) {
 	t.Parallel()
 	// Both keys canonicalize onto grok-imagine-video-1.5 and disagree on 480p.
@@ -93,7 +117,7 @@ func TestNormalizeVideoModelPricesIsDeterministicAcrossAliasConflicts(t *testing
 
 func TestLookupVideoBillingResolutionReportsUnknownTiers(t *testing.T) {
 	t.Parallel()
-	for _, in := range []string{"480", "480p", "SD", "720", "hd", "1080", "full-hd", " fhd "} {
+	for _, in := range []string{"480", "480p", "SD", "720", "hd", "768", "768p", "1080", "full-hd", " fhd ", "2K", "1440p"} {
 		normalized, ok := LookupVideoBillingResolution(in)
 		require.True(t, ok, "input=%q", in)
 		require.NotEmpty(t, normalized)
@@ -106,6 +130,8 @@ func TestLookupVideoBillingResolutionReportsUnknownTiers(t *testing.T) {
 	// Runtime billing still needs a tier for unrecognized upstream values.
 	require.Equal(t, VideoBillingResolution480P, NormalizeVideoBillingResolutionOrDefault("4k"))
 	require.Equal(t, VideoBillingResolution1080P, NormalizeVideoBillingResolutionOrDefault("full_hd"))
+	require.Equal(t, VideoBillingResolution768P, NormalizeVideoBillingResolutionOrDefault("768P"))
+	require.Equal(t, VideoBillingResolution2K, NormalizeVideoBillingResolutionOrDefault("2K"))
 }
 
 func TestVideoModelPriceMissingTierFallsBackToFlatTierPrice(t *testing.T) {

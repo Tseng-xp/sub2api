@@ -1330,6 +1330,7 @@ func extractOpenAIUsageFromJSONBytes(body []byte) (OpenAIUsage, bool) {
 		{usagePath: "response.usage", imageUsagePath: "response.tool_usage.image_gen"},
 		{usagePath: "data.usage", imageUsagePath: "data.tool_usage.image_gen"},
 		{usagePath: "data.response.usage", imageUsagePath: "data.response.tool_usage.image_gen"},
+		{usagePath: "task.usage", imageUsagePath: ""},
 	}
 	for _, candidate := range candidates {
 		if usage, ok := openAIUsageFromGJSON(gjson.GetBytes(body, candidate.usagePath)); ok {

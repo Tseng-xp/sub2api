@@ -230,11 +230,15 @@
         </div>
 
         <!-- Image/video mode -->
-        <div v-else-if="entry.billing_mode === 'image' || entry.billing_mode === 'video'">
+        <div v-else-if="entry.billing_mode === 'image' || entry.billing_mode === 'video' || entry.billing_mode === 'video_token_tiered'">
           <!-- Default image price (per-request, same as per_request mode) -->
           <label class="mt-3 block text-xs font-medium text-gray-500 dark:text-gray-400">
-            {{ entry.billing_mode === 'video' ? t('admin.channels.form.defaultVideoPrice') : t('admin.channels.form.defaultImagePrice') }}
-            <span class="ml-1 font-normal text-gray-400">$</span>
+            {{ entry.billing_mode === 'video_token_tiered'
+              ? t('admin.channels.form.defaultVideoTokenPrice')
+              : entry.billing_mode === 'video'
+                ? t('admin.channels.form.defaultVideoPrice')
+                : t('admin.channels.form.defaultImagePrice') }}
+            <span class="ml-1 font-normal text-gray-400">{{ entry.billing_mode === 'video_token_tiered' ? '$/MTok' : '$' }}</span>
           </label>
           <div class="mt-1 w-48">
             <input :value="entry.per_request_price" @input="emitField('per_request_price', ($event.target as HTMLInputElement).value)"
@@ -244,12 +248,19 @@
           <!-- Image tiers -->
           <div class="mt-3 flex items-center justify-between">
             <label class="text-xs font-medium text-gray-500 dark:text-gray-400">
-              {{ entry.billing_mode === 'video' ? t('admin.channels.form.videoTiers') : t('admin.channels.form.imageTiers') }}
+              {{ entry.billing_mode === 'video_token_tiered'
+                ? t('admin.channels.form.videoTokenTiers')
+                : entry.billing_mode === 'video'
+                  ? t('admin.channels.form.videoTiers')
+                  : t('admin.channels.form.imageTiers') }}
             </label>
             <button type="button" @click="addMediaTier" class="text-xs text-primary-600 hover:text-primary-700">
               + {{ t('admin.channels.form.addTier') }}
             </button>
           </div>
+          <p v-if="entry.billing_mode === 'video_token_tiered'" class="mt-1 text-xs text-gray-400">
+            {{ t('admin.channels.form.videoTokenTierHint') }}
+          </p>
           <div v-if="entry.intervals && entry.intervals.length > 0" class="mt-2 space-y-2">
             <IntervalRow
               v-for="(iv, idx) in entry.intervals"
@@ -305,7 +316,8 @@ const billingModeOptions = computed(() => [
   { value: 'token', label: t('admin.channels.billingMode.token') },
   { value: 'per_request', label: t('admin.channels.billingMode.perRequest') },
   { value: 'image', label: t('admin.channels.billingMode.image') },
-  { value: 'video', label: t('admin.channels.billingMode.video') }
+  { value: 'video', label: t('admin.channels.billingMode.video') },
+  { value: 'video_token_tiered', label: t('admin.channels.billingMode.videoTokenTiered') }
 ])
 
 const billingModeLabel = computed(() => {
@@ -339,11 +351,15 @@ function addInterval() {
 
 function addMediaTier() {
   const intervals = [...(props.entry.intervals || [])]
-  const labels = props.entry.billing_mode === 'video'
-    ? ['480p', '720p', '1080p']
+  const labels = props.entry.billing_mode === 'video_token_tiered'
+		? ['480p_with_ref', '480p_no_ref', '720p_with_ref', '720p_no_ref', '768p_with_ref', '768p_no_ref', '1080p_with_ref', '1080p_no_ref', '2k_with_ref', '2k_no_ref']
+    : props.entry.billing_mode === 'video'
+      ? ['480p', '720p', '1080p']
     : ['1K', '2K', '4K', 'HD']
+  const usedLabels = new Set(intervals.map(interval => interval.tier_label.trim().toLowerCase()))
+  const nextLabel = labels.find(label => !usedLabels.has(label.toLowerCase())) || ''
   intervals.push({
-    min_tokens: 0, max_tokens: null, tier_label: labels[intervals.length] || '',
+    min_tokens: 0, max_tokens: null, tier_label: nextLabel,
     input_price: null, output_price: null, cache_write_price: null,
     cache_write_1h_price: null,
     cache_read_price: null, per_request_price: null,

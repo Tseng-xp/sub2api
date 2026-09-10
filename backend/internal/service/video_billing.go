@@ -12,7 +12,50 @@ import (
 const (
 	VideoPriceFamilyGrokImagineVideo   = "grok-imagine-video"
 	VideoPriceFamilyGrokImagineVideo15 = "grok-imagine-video-1.5"
+
+	VideoPriceInputModeWithReference = "with_ref"
+	VideoPriceInputModeNoReference   = "no_ref"
 )
+
+func normalizeVideoPriceTier(tier string) (string, bool) {
+	tier = strings.ToLower(strings.TrimSpace(tier))
+	for _, inputMode := range []string{VideoPriceInputModeWithReference, VideoPriceInputModeNoReference} {
+		suffix := "_" + inputMode
+		if !strings.HasSuffix(tier, suffix) {
+			continue
+		}
+		resolution, ok := LookupVideoBillingResolution(strings.TrimSuffix(tier, suffix))
+		if !ok {
+			return "", false
+		}
+		return resolution + suffix, true
+	}
+	return LookupVideoBillingResolution(tier)
+}
+
+// VideoPriceTierForInput builds the channel/group tier label used by video
+// pricing rules, for example 1080p_with_ref or 1080p_no_ref.
+func VideoPriceTierForInput(resolution string, hasReferenceInput bool) string {
+	inputMode := VideoPriceInputModeNoReference
+	if hasReferenceInput {
+		inputMode = VideoPriceInputModeWithReference
+	}
+	return NormalizeVideoBillingResolutionOrDefault(resolution) + "_" + inputMode
+}
+
+func videoPriceTierFallbackResolution(tier string) string {
+	normalized, ok := normalizeVideoPriceTier(tier)
+	if !ok {
+		return ""
+	}
+	for _, inputMode := range []string{VideoPriceInputModeWithReference, VideoPriceInputModeNoReference} {
+		suffix := "_" + inputMode
+		if strings.HasSuffix(normalized, suffix) {
+			return strings.TrimSuffix(normalized, suffix)
+		}
+	}
+	return ""
+}
 
 // CanonicalGrokImagineVideoPriceFamily normalizes model aliases / preview / legacy
 // IDs onto the price-family keys stored in video_model_prices.
@@ -53,7 +96,8 @@ func CanonicalGrokImagineVideoPriceFamily(model string) string {
 }
 
 // NormalizeVideoModelPrices cleans and canonicalizes a per-model resolution map.
-// Keys become price families; tiers use 480p/720p/1080p. Negative prices dropped.
+// Keys become price families; tiers use known video resolutions such as
+// 480p/720p/768p/1080p/2k. Negative prices are dropped.
 //
 // Model keys are walked in sorted order rather than in Go map order: several
 // aliases can canonicalize onto the same family, and an unordered walk would
@@ -102,7 +146,7 @@ func NormalizeVideoModelPrices(in map[string]map[string]float64) map[string]map[
 			if price < 0 {
 				continue
 			}
-			tier, ok := LookupVideoBillingResolution(tierKey)
+			tier, ok := normalizeVideoPriceTier(tierKey)
 			if !ok {
 				slog.Warn("video_model_prices_unknown_resolution_dropped",
 					"model_key", modelKey,
@@ -132,6 +176,21 @@ func NormalizeVideoModelPrices(in map[string]map[string]float64) map[string]map[
 
 // LookupVideoModelPrice returns a per-second price from a model×resolution map, or nil.
 func LookupVideoModelPrice(prices map[string]map[string]float64, model, resolution string) *float64 {
+	return lookupVideoModelPrice(prices, model, resolution, "")
+}
+
+// LookupVideoModelPriceForInput supports providers that price image-to-video
+// and text-to-video differently. A mode-specific tier wins, while the legacy
+// resolution-only tier remains a backward-compatible fallback.
+func LookupVideoModelPriceForInput(prices map[string]map[string]float64, model, resolution string, hasReferenceInput bool) *float64 {
+	inputMode := VideoPriceInputModeNoReference
+	if hasReferenceInput {
+		inputMode = VideoPriceInputModeWithReference
+	}
+	return lookupVideoModelPrice(prices, model, resolution, inputMode)
+}
+
+func lookupVideoModelPrice(prices map[string]map[string]float64, model, resolution, inputMode string) *float64 {
 	if len(prices) == 0 {
 		return nil
 	}
@@ -147,6 +206,12 @@ func LookupVideoModelPrice(prices map[string]map[string]float64, model, resoluti
 		return nil
 	}
 	tier := NormalizeVideoBillingResolutionOrDefault(resolution)
+	if inputMode != "" {
+		if price, ok := tierPrices[tier+"_"+inputMode]; ok {
+			p := price
+			return &p
+		}
+	}
 	if price, ok := tierPrices[tier]; ok {
 		p := price
 		return &p

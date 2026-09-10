@@ -67,6 +67,7 @@ type GrokMediaRequestInfo struct {
 	MaskImageURL    string
 	Uploads         []OpenAIImagesUpload
 	MaskUpload      *OpenAIImagesUpload
+	ReferenceInput  bool
 }
 
 func (r GrokMediaRequestInfo) ModerationBody() []byte {
@@ -146,7 +147,10 @@ func parseGrokMediaJSONRequest(body []byte, info *GrokMediaRequestInfo) {
 	info.Model = strings.TrimSpace(gjson.GetBytes(body, "model").String())
 	info.Prompt = strings.TrimSpace(gjson.GetBytes(body, "prompt").String())
 	info.Size = strings.TrimSpace(gjson.GetBytes(body, "size").String())
-	info.AspectRatio = strings.TrimSpace(gjson.GetBytes(body, "aspect_ratio").String())
+	info.AspectRatio = firstNonEmpty(
+		strings.TrimSpace(gjson.GetBytes(body, "ratio").String()),
+		strings.TrimSpace(gjson.GetBytes(body, "aspect_ratio").String()),
+	)
 	assignGrokMediaResolution(strings.TrimSpace(gjson.GetBytes(body, "resolution").String()), info)
 	if duration := gjson.GetBytes(body, "duration"); duration.Exists() && duration.Type == gjson.Number {
 		info.DurationSeconds = int(duration.Int())
@@ -175,6 +179,25 @@ func parseGrokMediaJSONRequest(body []byte, info *GrokMediaRequestInfo) {
 	appendJSONImageURLs(gjson.GetBytes(body, "images"))
 	appendJSONImageURLs(gjson.GetBytes(body, "reference_images"))
 	info.MaskImageURL = extractGrokMediaImageURL(gjson.GetBytes(body, "mask"))
+	if content := gjson.GetBytes(body, "content"); content.Exists() && content.IsArray() {
+		for _, item := range content.Array() {
+			typ := strings.ToLower(strings.TrimSpace(item.Get("type").String()))
+			if typ == "text" {
+				if info.Prompt == "" {
+					info.Prompt = strings.TrimSpace(item.Get("text").String())
+				}
+				continue
+			}
+			if typ != "" {
+				info.ReferenceInput = true
+			}
+			if typ == "image_url" {
+				if imageURL := extractGrokMediaImageURL(item); imageURL != "" {
+					info.InputImageURLs = append(info.InputImageURLs, imageURL)
+				}
+			}
+		}
+	}
 }
 
 func extractGrokMediaImageURL(value gjson.Result) string {
@@ -336,12 +359,13 @@ func (s *OpenAIGatewayService) ResolveGrokMediaVideoRequestAccount(
 // first observes a completed video URL. Status may omit model/duration; we fall
 // back to this snapshot, then defaults.
 type GrokVideoPendingBilling struct {
-	Model                string `json:"model"`
-	BillingModel         string `json:"billing_model,omitempty"`
-	UpstreamModel        string `json:"upstream_model,omitempty"`
-	VideoResolution      string `json:"video_resolution,omitempty"`
-	VideoDurationSeconds int    `json:"video_duration_seconds,omitempty"`
-	OriginalModel        string `json:"original_model,omitempty"`
+	Model                  string `json:"model"`
+	BillingModel           string `json:"billing_model,omitempty"`
+	UpstreamModel          string `json:"upstream_model,omitempty"`
+	VideoResolution        string `json:"video_resolution,omitempty"`
+	VideoDurationSeconds   int    `json:"video_duration_seconds,omitempty"`
+	VideoHasReferenceInput bool   `json:"video_has_reference_input,omitempty"`
+	OriginalModel          string `json:"original_model,omitempty"`
 	// CreatedAt is when the gateway accepted the async create (RFC3339Nano UTC).
 	// duration_ms for deferred billing is measured from this instant until the
 	// first official done+video.url observation (status poll or content download),
@@ -515,16 +539,23 @@ func StableGrokVideoBillingRequestID(taskRequestID string) string {
 // Request may include resolution ("480p"|"720p"|"1080p"); completed status does not
 // document a resolution field — bill resolution from the create-time request snapshot.
 
-// IsGrokVideoStatusBillable matches official success: status == "done" AND non-empty video.url.
-// pending / expired / failed, or done without a video URL, are not billable.
+// IsGrokVideoStatusBillable matches the supported terminal-success shapes:
+// xAI uses status=done + video.url; the configured Seedance v2 supplier uses
+// task.status=completed + task.outputs[0]; Tencent TokenHub H3 uses
+// task.status=succeeded + task.content.url. Other states are not billable.
 func IsGrokVideoStatusBillable(statusBody []byte) bool {
 	if len(statusBody) == 0 || !gjson.ValidBytes(statusBody) {
 		return false
 	}
-	if !isOfficialGrokVideoStatusDone(statusBody) {
-		return false
+	if isOfficialGrokVideoStatusDone(statusBody) {
+		return strings.TrimSpace(gjson.GetBytes(statusBody, "video.url").String()) != ""
 	}
-	return strings.TrimSpace(gjson.GetBytes(statusBody, "video.url").String()) != ""
+	taskStatus := strings.TrimSpace(gjson.GetBytes(statusBody, "task.status").String())
+	if strings.EqualFold(taskStatus, "completed") {
+		return strings.TrimSpace(gjson.GetBytes(statusBody, "task.outputs.0").String()) != ""
+	}
+	return strings.EqualFold(taskStatus, "succeeded") &&
+		strings.TrimSpace(gjson.GetBytes(statusBody, "task.content.url").String()) != ""
 }
 
 func isOfficialGrokVideoStatusDone(statusBody []byte) bool {
@@ -548,8 +579,11 @@ func ExtractGrokVideoBillingFromStatusBody(statusBody []byte, pending *GrokVideo
 	durationSeconds := 0
 
 	if gjson.ValidBytes(statusBody) {
-		// Official: top-level model.
-		model = strings.TrimSpace(gjson.GetBytes(statusBody, "model").String())
+		// xAI: top-level model. Seedance v2: task.model.
+		model = firstNonEmpty(
+			strings.TrimSpace(gjson.GetBytes(statusBody, "model").String()),
+			strings.TrimSpace(gjson.GetBytes(statusBody, "task.model").String()),
+		)
 		// Official: video.duration (number of seconds).
 		if v := gjson.GetBytes(statusBody, "video.duration"); v.Exists() && v.Type == gjson.Number {
 			durationSeconds = int(v.Int())
@@ -558,6 +592,17 @@ func ExtractGrokVideoBillingFromStatusBody(statusBody []byte, pending *GrokVideo
 				durationSeconds = int(v.Float())
 			}
 		}
+		if durationSeconds <= 0 {
+			if v := gjson.GetBytes(statusBody, "task.duration_seconds"); v.Exists() && v.Type == gjson.Number {
+				durationSeconds = int(v.Int())
+			}
+		}
+		if durationSeconds <= 0 {
+			if v := gjson.GetBytes(statusBody, "task.usage.output_seconds"); v.Exists() && v.Type == gjson.Number {
+				durationSeconds = int(v.Int())
+			}
+		}
+		resolution = strings.TrimSpace(gjson.GetBytes(statusBody, "task.metadata.resolution").String())
 	}
 	if pending != nil {
 		if model == "" {
@@ -569,8 +614,11 @@ func ExtractGrokVideoBillingFromStatusBody(statusBody []byte, pending *GrokVideo
 		if upstreamModel == "" {
 			upstreamModel = pending.UpstreamModel
 		}
-		// Official status has no resolution — always take create request when available.
-		resolution = pending.VideoResolution
+		// Prefer create-time resolution so billing cannot be changed by a surprising
+		// status payload. It is also the only source for xAI.
+		if strings.TrimSpace(pending.VideoResolution) != "" {
+			resolution = pending.VideoResolution
+		}
 		if durationSeconds <= 0 {
 			durationSeconds = pending.VideoDurationSeconds
 		}
@@ -593,14 +641,29 @@ func ExtractGrokVideoBillingFromStatusBody(statusBody []byte, pending *GrokVideo
 	if responseID == "" {
 		responseID = strings.TrimSpace(requestID)
 	}
+	usage, _ := extractOpenAIUsageFromJSONBytes(statusBody)
+	// TokenHub returns the authoritative billable quantity separately from the
+	// provider task details. Store total_tokens in OutputTokens so the existing
+	// video_token_tiered path charges exactly one $/MTok rate and never adds the
+	// same tokens twice as input + output.
+	if usage.OutputTokens <= 0 {
+		for _, path := range []string{"tokenhub_usage.total_tokens", "task.tokenhub_usage.total_tokens"} {
+			if total := gjson.GetBytes(statusBody, path); total.Exists() && total.Type == gjson.Number && total.Int() > 0 {
+				usage.OutputTokens = int(total.Int())
+				break
+			}
+		}
+	}
 	return &OpenAIForwardResult{
-		ResponseID:           responseID,
-		Model:                model,
-		BillingModel:         billingModel,
-		UpstreamModel:        upstreamModel,
-		VideoCount:           1,
-		VideoResolution:      resolution,
-		VideoDurationSeconds: durationSeconds,
+		ResponseID:             responseID,
+		Model:                  model,
+		BillingModel:           billingModel,
+		UpstreamModel:          upstreamModel,
+		VideoCount:             1,
+		VideoResolution:        resolution,
+		VideoDurationSeconds:   durationSeconds,
+		VideoHasReferenceInput: pending != nil && pending.VideoHasReferenceInput,
+		Usage:                  usage,
 	}
 }
 
@@ -628,6 +691,8 @@ func (s *OpenAIGatewayService) ForwardGrokMedia(
 	if endpoint == GrokMediaEndpointVideoContent {
 		return s.forwardGrokMediaVideoContent(ctx, c, account, token, requestID, startTime)
 	}
+	seedanceV2 := isSeedanceV2MediaBaseURL(account.GetGrokMediaBaseURL())
+	tencentTokenHub := isTencentTokenHubMediaBaseURL(account.GetGrokMediaBaseURL())
 	targetURL, err := buildGrokMediaURL(account, s.cfg, endpoint, requestID)
 	if err != nil {
 		return nil, err
@@ -652,6 +717,18 @@ func (s *OpenAIGatewayService) ForwardGrokMedia(
 			if err != nil {
 				return nil, fmt.Errorf("rewrite grok media account mapped model: %w", err)
 			}
+		}
+	}
+	if seedanceV2 && endpoint == GrokMediaEndpointVideosGenerations {
+		body, contentType, err = prepareSeedanceV2VideoBody(body, contentType, requestInfo, upstreamModel)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if tencentTokenHub && endpoint == GrokMediaEndpointVideosGenerations {
+		body, contentType, requestInfo, err = prepareTencentTokenHubVideoBody(body, contentType, requestInfo, upstreamModel)
+		if err != nil {
+			return nil, err
 		}
 	}
 	body, contentType, err = sanitizeGrokMediaForwardBody(endpoint, body, contentType)
@@ -717,7 +794,7 @@ func (s *OpenAIGatewayService) ForwardGrokMedia(
 			}
 		}
 	}
-	if endpoint == GrokMediaEndpointVideoStatus {
+	if endpoint == GrokMediaEndpointVideoStatus && !seedanceV2 && !tencentTokenHub {
 		respBody = rewriteGrokMediaVideoContentURLs(
 			respBody,
 			requestID,
@@ -738,22 +815,23 @@ func (s *OpenAIGatewayService) ForwardGrokMedia(
 		}
 	}
 	return &OpenAIForwardResult{
-		RequestID:            requestIDHeader,
-		UpstreamHeaders:      resp.Header,
-		ResponseID:           usage.ResponseID,
-		Usage:                usage.Usage,
-		Model:                resultModel,
-		BillingModel:         resultBillingModel,
-		UpstreamModel:        upstreamModel,
-		ResponseHeaders:      resp.Header.Clone(),
-		Duration:             time.Since(startTime),
-		ImageCount:           usage.ImageCount,
-		ImageSize:            usage.ImageSize,
-		ImageInputSize:       usage.ImageInputSize,
-		ImageOutputSizes:     usage.ImageOutputSizes,
-		VideoCount:           usage.VideoCount,
-		VideoResolution:      usage.VideoResolution,
-		VideoDurationSeconds: usage.VideoDurationSeconds,
+		RequestID:              requestIDHeader,
+		UpstreamHeaders:        resp.Header,
+		ResponseID:             usage.ResponseID,
+		Usage:                  usage.Usage,
+		Model:                  resultModel,
+		BillingModel:           resultBillingModel,
+		UpstreamModel:          upstreamModel,
+		ResponseHeaders:        resp.Header.Clone(),
+		Duration:               time.Since(startTime),
+		ImageCount:             usage.ImageCount,
+		ImageSize:              usage.ImageSize,
+		ImageInputSize:         usage.ImageInputSize,
+		ImageOutputSizes:       usage.ImageOutputSizes,
+		VideoCount:             usage.VideoCount,
+		VideoResolution:        usage.VideoResolution,
+		VideoDurationSeconds:   usage.VideoDurationSeconds,
+		VideoHasReferenceInput: usage.VideoHasReferenceInput,
 	}, nil
 }
 
@@ -886,12 +964,18 @@ func (s *OpenAIGatewayService) forwardGrokMediaVideoContent(
 		result.VideoCount = billed.VideoCount
 		result.VideoResolution = billed.VideoResolution
 		result.VideoDurationSeconds = billed.VideoDurationSeconds
+		result.VideoHasReferenceInput = billed.VideoHasReferenceInput
+		result.Usage = billed.Usage
 	}
 	return result, nil
 }
 
 func grokMediaSignedVideoContentURL(body []byte, requestID string) (string, error) {
-	rawURL := strings.TrimSpace(gjson.GetBytes(body, "video.url").String())
+	rawURL := firstNonEmpty(
+		strings.TrimSpace(gjson.GetBytes(body, "video.url").String()),
+		strings.TrimSpace(gjson.GetBytes(body, "task.outputs.0").String()),
+		strings.TrimSpace(gjson.GetBytes(body, "task.content.url").String()),
+	)
 	if rawURL == "" {
 		return "", nil
 	}
@@ -903,8 +987,12 @@ func grokMediaSignedVideoContentURL(body []byte, requestID string) (string, erro
 		return "", nil
 	}
 	parsed, err := url.Parse(rawURL)
-	if err != nil || !strings.EqualFold(parsed.Scheme, "https") ||
-		!strings.EqualFold(parsed.Hostname(), "vidgen.x.ai") ||
+	if err != nil || parsed == nil {
+		return "", fmt.Errorf("grok media status returned an unsupported video content URL")
+	}
+	host := strings.ToLower(parsed.Hostname())
+	trustedHost := host == "vidgen.x.ai" || strings.HasSuffix(host, ".volces.com")
+	if !strings.EqualFold(parsed.Scheme, "https") || !trustedHost ||
 		(parsed.Port() != "" && parsed.Port() != "443") || parsed.User != nil {
 		return "", fmt.Errorf("grok media status returned an unsupported video content URL")
 	}
@@ -1135,6 +1223,165 @@ func (r GrokMediaRequestInfo) HasInputImage() bool {
 	return len(r.InputImageURLs) > 0 || len(r.Uploads) > 0
 }
 
+// HasReferenceInput distinguishes text-only generation from any image, video,
+// audio, first-frame or last-frame reference. Supplier token rate cards use
+// this broader distinction rather than only checking legacy image fields.
+func (r GrokMediaRequestInfo) HasReferenceInput() bool {
+	return r.ReferenceInput || r.HasInputImage()
+}
+
+func prepareSeedanceV2VideoBody(body []byte, contentType string, info GrokMediaRequestInfo, upstreamModel string) ([]byte, string, error) {
+	if !gjson.ValidBytes(body) {
+		return nil, "", fmt.Errorf("seedance v2 video generation requires an application/json request body")
+	}
+	var original map[string]any
+	decoder := json.NewDecoder(bytes.NewReader(body))
+	decoder.UseNumber()
+	if err := decoder.Decode(&original); err != nil {
+		return nil, "", fmt.Errorf("decode seedance v2 video request: %w", err)
+	}
+
+	content, _ := original["content"].([]any)
+	if len(content) == 0 {
+		content = make([]any, 0, 1+len(info.InputImageURLs))
+		if prompt := strings.TrimSpace(info.Prompt); prompt != "" {
+			content = append(content, map[string]any{"type": "text", "text": prompt})
+		}
+		for _, imageURL := range info.InputImageURLs {
+			if imageURL = strings.TrimSpace(imageURL); imageURL != "" {
+				content = append(content, map[string]any{
+					"type":      "image_url",
+					"image_url": map[string]any{"url": imageURL},
+					"role":      "reference_image",
+				})
+			}
+		}
+	}
+	if len(content) == 0 {
+		return nil, "", fmt.Errorf("seedance v2 video request requires content or prompt")
+	}
+
+	payload := map[string]any{
+		"model":      strings.TrimSpace(upstreamModel),
+		"content":    content,
+		"duration":   info.DurationSeconds,
+		"resolution": info.Resolution,
+	}
+	if info.AspectRatio != "" {
+		payload["ratio"] = info.AspectRatio
+	}
+	if generateAudio, ok := original["generate_audio"].(bool); ok {
+		payload["generate_audio"] = generateAudio
+	}
+	prepared, err := json.Marshal(payload)
+	if err != nil {
+		return nil, "", fmt.Errorf("encode seedance v2 video request: %w", err)
+	}
+	return prepared, "application/json", nil
+}
+
+func prepareTencentTokenHubVideoBody(body []byte, contentType string, info GrokMediaRequestInfo, upstreamModel string) ([]byte, string, GrokMediaRequestInfo, error) {
+	if !gjson.ValidBytes(body) {
+		return nil, "", info, fmt.Errorf("tencent tokenhub video generation requires an application/json request body")
+	}
+	model := strings.ToLower(strings.TrimSpace(upstreamModel))
+	if model != "minimax-video-h3" && model != "minimax-video-h3-max" {
+		return nil, "", info, fmt.Errorf("tencent tokenhub video adapter requires minimax-video-h3 or minimax-video-h3-max")
+	}
+	var original map[string]any
+	decoder := json.NewDecoder(bytes.NewReader(body))
+	decoder.UseNumber()
+	if err := decoder.Decode(&original); err != nil {
+		return nil, "", info, fmt.Errorf("decode tencent tokenhub video request: %w", err)
+	}
+
+	content, _ := original["content"].([]any)
+	if len(content) == 0 {
+		content = make([]any, 0, 1+len(info.InputImageURLs))
+		if prompt := strings.TrimSpace(info.Prompt); prompt != "" {
+			content = append(content, map[string]any{"type": "text", "text": prompt})
+		}
+		for _, imageURL := range info.InputImageURLs {
+			if imageURL = strings.TrimSpace(imageURL); imageURL != "" {
+				content = append(content, map[string]any{
+					"type":      "image_url",
+					"image_url": map[string]any{"url": imageURL},
+					"role":      "first_frame",
+				})
+			}
+		}
+	}
+	if len(content) == 0 {
+		return nil, "", info, fmt.Errorf("tencent tokenhub video request requires content or prompt")
+	}
+
+	rawResolution := strings.TrimSpace(gjson.GetBytes(body, "resolution").String())
+	resolution, err := normalizeTencentTokenHubVideoResolution(rawResolution, model)
+	if err != nil {
+		return nil, "", info, err
+	}
+	duration := info.DurationSeconds
+	if model == "minimax-video-h3-max" && duration < 5 {
+		return nil, "", info, fmt.Errorf("minimax-video-h3-max duration must be between 5 and 15 seconds")
+	}
+
+	payload := map[string]any{
+		"model":      strings.TrimSpace(upstreamModel),
+		"content":    content,
+		"duration":   duration,
+		"resolution": tencentTokenHubResolutionValue(resolution),
+	}
+	if ratio := strings.TrimSpace(info.AspectRatio); ratio != "" {
+		payload["ratio"] = ratio
+	} else if !info.HasReferenceInput() {
+		// H3 text-to-video requires a non-adaptive ratio. Keep the public API
+		// convenient while choosing the provider's conventional documented ratio.
+		payload["ratio"] = "16:9"
+	}
+	if watermark, ok := original["aigc_watermark"].(bool); ok {
+		payload["aigc_watermark"] = watermark
+	}
+	prepared, err := json.Marshal(payload)
+	if err != nil {
+		return nil, "", info, fmt.Errorf("encode tencent tokenhub video request: %w", err)
+	}
+	info.Resolution = resolution
+	info.DurationSeconds = duration
+	return prepared, "application/json", info, nil
+}
+
+func normalizeTencentTokenHubVideoResolution(rawResolution, model string) (string, error) {
+	raw := strings.ToLower(strings.TrimSpace(rawResolution))
+	isMax := strings.EqualFold(strings.TrimSpace(model), "minimax-video-h3-max")
+	switch raw {
+	case "", "720", "720p", "768", "768p", "1080", "1080p", "full_hd", "full-hd", "fhd":
+		return VideoBillingResolution768P, nil
+	case "480", "480p", "sd":
+		if isMax {
+			return VideoBillingResolution480P, nil
+		}
+		return VideoBillingResolution768P, nil
+	case "2k", "1440", "1440p", "4k", "2160", "2160p":
+		if isMax {
+			return VideoBillingResolution768P, nil
+		}
+		return VideoBillingResolution2K, nil
+	default:
+		return "", fmt.Errorf("unsupported tencent tokenhub video resolution %q", rawResolution)
+	}
+}
+
+func tencentTokenHubResolutionValue(resolution string) string {
+	switch resolution {
+	case VideoBillingResolution480P:
+		return "480P"
+	case VideoBillingResolution2K:
+		return "2K"
+	default:
+		return "768P"
+	}
+}
+
 // NormalizeGrokMediaModelForEndpoint resolves the built-in upstream model alias
 // for a media endpoint before account-level model mapping and scheduling.
 func NormalizeGrokMediaModelForEndpoint(endpoint GrokMediaEndpoint, model string, hasInputImage bool) string {
@@ -1155,17 +1402,18 @@ func NormalizeGrokMediaModelForEndpoint(endpoint GrokMediaEndpoint, model string
 }
 
 type grokMediaUsageMetadata struct {
-	ResponseID           string
-	Usage                OpenAIUsage
-	Model                string
-	BillingModel         string
-	ImageCount           int
-	ImageSize            string
-	ImageInputSize       string
-	ImageOutputSizes     []string
-	VideoCount           int
-	VideoResolution      string
-	VideoDurationSeconds int
+	ResponseID             string
+	Usage                  OpenAIUsage
+	Model                  string
+	BillingModel           string
+	ImageCount             int
+	ImageSize              string
+	ImageInputSize         string
+	ImageOutputSizes       []string
+	VideoCount             int
+	VideoResolution        string
+	VideoDurationSeconds   int
+	VideoHasReferenceInput bool
 }
 
 func grokMediaUsageFromResponse(endpoint GrokMediaEndpoint, requestInfo GrokMediaRequestInfo, responseBody []byte) grokMediaUsageMetadata {
@@ -1183,6 +1431,7 @@ func grokMediaUsageFromResponse(endpoint GrokMediaEndpoint, requestInfo GrokMedi
 		meta.ResponseID = extractGrokMediaVideoRequestID(responseBody)
 		meta.VideoResolution = requestInfo.Resolution
 		meta.VideoDurationSeconds = requestInfo.DurationSeconds
+		meta.VideoHasReferenceInput = requestInfo.HasReferenceInput()
 	case GrokMediaEndpointVideoStatus:
 		// Prefer status-body URL success + upstream duration/resolution when present.
 		if IsGrokVideoStatusBillable(responseBody) {
@@ -1194,6 +1443,7 @@ func grokMediaUsageFromResponse(endpoint GrokMediaEndpoint, requestInfo GrokMedi
 				meta.VideoCount = billed.VideoCount
 				meta.VideoResolution = billed.VideoResolution
 				meta.VideoDurationSeconds = billed.VideoDurationSeconds
+				meta.VideoHasReferenceInput = billed.VideoHasReferenceInput
 			}
 		}
 	}
@@ -1204,7 +1454,7 @@ func extractGrokMediaVideoRequestID(body []byte) string {
 	if len(body) == 0 || !gjson.ValidBytes(body) {
 		return ""
 	}
-	for _, path := range []string{"request_id", "id", "data.request_id", "data.id", "video.request_id", "video.id", "task_id", "data.task_id", "video.task_id"} {
+	for _, path := range []string{"request_id", "id", "task.id", "data.request_id", "data.id", "video.request_id", "video.id", "task_id", "data.task_id", "video.task_id"} {
 		if id := strings.TrimSpace(gjson.GetBytes(body, path).String()); id != "" {
 			return id
 		}
