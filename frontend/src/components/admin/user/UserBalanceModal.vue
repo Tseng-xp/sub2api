@@ -30,6 +30,7 @@ import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { useCurrencyStore } from '@/stores/currency'
 import { adminAPI } from '@/api/admin'
+import { extractApiErrorMessage } from '@/utils/apiError'
 import type { AdminUser } from '@/types'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 
@@ -73,7 +74,7 @@ const handleBalanceSubmit = async () => {
     appStore.showSuccess(t('common.success')); emit('success'); emit('close')
   } catch (e: any) {
     console.error('Failed to update balance:', e)
-    appStore.showError(e.response?.data?.detail || t('common.error'))
+    appStore.showError(extractApiErrorMessage(e, t('common.error')))
   } finally { submitting.value = false }
 }
 </script>

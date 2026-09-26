@@ -422,6 +422,7 @@ import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores'
 import { useCurrencyStore } from '@/stores/currency'
+import { FeatureFlags, resolveFeatureFlag } from '@/utils/featureFlags'
 import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { buildGatewayUrl } from '@/api/client'
@@ -431,6 +432,7 @@ import { sanitizeUrl } from '@/utils/url'
 const { t, locale } = useI18n()
 const appStore = useAppStore()
 const currencyStore = useCurrencyStore()
+const subscriptionFeatureEnabled = computed(() => resolveFeatureFlag(appStore.cachedPublicSettings, FeatureFlags.subscription))
 
 // ==================== Site Settings (same as HomeView) ====================
 
@@ -543,6 +545,16 @@ const RING_GRADIENTS = [
 
 const ringAnimated = ref(false)
 const displayPcts = ref<number[]>([])
+let ringUnmounted = false
+let ringDelayTimer: ReturnType<typeof setTimeout> | null = null
+let ringFrame: number | null = null
+
+function stopRingAnimation() {
+  if (ringDelayTimer !== null) clearTimeout(ringDelayTimer)
+  if (ringFrame !== null && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(ringFrame)
+  ringDelayTimer = null
+  ringFrame = null
+}
 
 const ringTrackColor = computed(() => isDark.value ? '#222222' : '#F0F0EE')
 
@@ -562,12 +574,16 @@ function getRingOffset(ring: RingItem): number {
 }
 
 function triggerRingAnimation(items: RingItem[]) {
+  stopRingAnimation()
   ringAnimated.value = false
   displayPcts.value = items.map(() => 0)
 
   nextTick(() => {
-    requestAnimationFrame(() => {
-      setTimeout(() => {
+    if (ringUnmounted) return
+    ringFrame = requestAnimationFrame(() => {
+      if (ringUnmounted) return
+      ringDelayTimer = setTimeout(() => {
+        if (ringUnmounted) return
         ringAnimated.value = true
 
         // Animate percentage numbers
@@ -576,13 +592,14 @@ function triggerRingAnimation(items: RingItem[]) {
         const targets = items.map(item => item.isBalance ? 0 : item.pct)
 
         function tick() {
+          if (ringUnmounted) return
           const elapsed = performance.now() - startTime
           const p = Math.min(elapsed / duration, 1)
           const ease = 1 - Math.pow(1 - p, 3)
           displayPcts.value = targets.map(target => Math.round(ease * target))
-          if (p < 1) requestAnimationFrame(tick)
+          if (p < 1) ringFrame = requestAnimationFrame(tick)
         }
-        requestAnimationFrame(tick)
+        ringFrame = requestAnimationFrame(tick)
       }, 50)
     })
   })
@@ -736,7 +753,9 @@ const detailRows = computed<DetailRow[]>(() => {
   } else {
     rows.push({
       iconBg: 'bg-emerald-500/10', iconColor: 'text-emerald-500', iconSvg: ICON_CHECK,
-      label: t('keyUsage.subscriptionType'), value: data.planName || t('keyUsage.walletBalance'), valueClass: '',
+      // 订阅功能关闭后这一行只会是「钱包余额」，标签改用不带「订阅」字样的「计费方式」。
+      label: subscriptionFeatureEnabled.value ? t('keyUsage.subscriptionType') : t('keyUsage.billingType'),
+      value: data.planName || t('keyUsage.walletBalance'), valueClass: '',
     })
 
     if (data.subscription) {
@@ -935,6 +954,7 @@ function formatResetTime(resetAt: string | null | undefined): string {
 }
 
 onMounted(() => {
+  ringUnmounted = false
   initTheme()
   if (!appStore.publicSettingsLoaded) {
     appStore.fetchPublicSettings()
@@ -943,6 +963,8 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  ringUnmounted = true
+  stopRingAnimation()
   if (resetTimer) clearInterval(resetTimer)
 })
 </script>

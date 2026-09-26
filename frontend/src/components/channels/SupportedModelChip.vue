@@ -135,6 +135,22 @@
               :scale="1"
             />
 
+            <PricingRow
+              v-if="model.pricing.billing_mode === BILLING_MODE_VIDEO && model.pricing.per_request_price != null"
+              :label="t(prefixKey('videoPrice'))"
+              :value="model.pricing.per_request_price"
+              :unit="t(prefixKey('unitPerSecond'))"
+              :scale="1"
+            />
+
+            <PricingRow
+              v-if="model.pricing.billing_mode === BILLING_MODE_VIDEO_TOKEN_TIERED && model.pricing.per_request_price != null"
+              :label="t(prefixKey('videoTokenPrice'))"
+              :value="model.pricing.per_request_price"
+              :unit="t(prefixKey('unitPerMillion'))"
+              :scale="1"
+            />
+
             <div
               v-if="model.pricing.intervals && model.pricing.intervals.length > 0"
               class="mt-2 border-t pt-2"
@@ -153,7 +169,7 @@
                     <template v-if="iv.tier_label">{{ iv.tier_label }}</template>
                     <template v-else>{{ formatRange(iv.min_tokens, iv.max_tokens) }}</template>
                   </span>
-                  <span>{{ formatInterval(iv, model.pricing.billing_mode) }}</span>
+                  <span>{{ formatInterval(iv, model.pricing) }}</span>
                 </div>
               </div>
             </div>
@@ -168,7 +184,7 @@
 import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import PricingRow from './PricingRow.vue'
-import { formatScaled } from '@/utils/pricing'
+import { formatScaled, resolveIntervalPrices } from '@/utils/pricing'
 import { useCurrencyStore } from '@/stores/currency'
 import {
   BILLING_MODE_TOKEN,
@@ -176,11 +192,10 @@ import {
   BILLING_MODE_IMAGE,
   BILLING_MODE_VIDEO,
   BILLING_MODE_VIDEO_TOKEN_TIERED,
-  type BillingMode
 } from '@/constants/channel'
 // 复用 api/channels.ts 的用户侧最小形态 DTO。
 // admin 侧 ChannelModelPricing 字段更多，但结构上是用户 DTO 的超集，admin 视图传入可直接通过结构化子类型检查。
-import type { UserPricingInterval, UserSupportedModel } from '@/api/channels'
+import type { UserPricingInterval, UserSupportedModel, UserSupportedModelPricing } from '@/api/channels'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
 import type { GroupPlatform } from '@/types'
 import { platformBadgeClass, platformBorderClass, platformBadgeLightClass } from '@/utils/platformColors'
@@ -254,16 +269,23 @@ function formatRange(min: number, max: number | null): string {
   return `(${min}, ${maxLabel}]`
 }
 
-function formatInterval(iv: UserPricingInterval, mode: BillingMode): string {
+function formatInterval(iv: UserPricingInterval, pricing: UserSupportedModelPricing): string {
   const opts = {
     convert: currencyStore.convertAmount,
     currencySymbol: currencyStore.currencySymbol,
   }
-  if (mode === BILLING_MODE_PER_REQUEST || mode === BILLING_MODE_IMAGE || mode === BILLING_MODE_VIDEO || mode === BILLING_MODE_VIDEO_TOKEN_TIERED) {
+  if (pricing.billing_mode === BILLING_MODE_VIDEO) {
+    return `${formatScaled(iv.per_request_price, 1, opts)} ${t(prefixKey('unitPerSecond'))}`
+  }
+  if (pricing.billing_mode === BILLING_MODE_PER_REQUEST || pricing.billing_mode === BILLING_MODE_IMAGE) {
     return formatScaled(iv.per_request_price, 1, opts)
   }
-  const input = formatScaled(iv.input_price, perMillionScale, opts)
-  const output = formatScaled(iv.output_price, perMillionScale, opts)
+  if (pricing.billing_mode === BILLING_MODE_VIDEO_TOKEN_TIERED) {
+    return `${formatScaled(iv.per_request_price, 1, opts)} ${t(prefixKey('unitPerMillion'))}`
+  }
+  const resolved = resolveIntervalPrices(iv, pricing)
+  const input = formatScaled(resolved.input_price, perMillionScale, opts)
+  const output = formatScaled(resolved.output_price, perMillionScale, opts)
   return `${input} / ${output}`
 }
 
